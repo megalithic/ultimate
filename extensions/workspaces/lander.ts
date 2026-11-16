@@ -584,7 +584,10 @@ export function createLander(
             if (!merged) {
               await step('preparing')
               const base = await git(path, 'rev-parse', 'HEAD')
-              /** Merge `commit` into the checkout; true when it conflicted and the submission failed. */
+              /**
+               * Merge `commit` into the checkout; true when it failed and so did the submission. A failure without
+               * conflicting paths (a commit hook or signing refused the merge commit) reports Git's own output.
+               */
               const merge = async (
                 commit: string,
                 message: string,
@@ -594,10 +597,16 @@ export function createLander(
                 try {
                   await git(path, 'merge', '--no-edit', '-m', message, commit)
                   return false
-                } catch {
+                } catch (error) {
                   const conflicts = await git(path, 'diff', '--name-only', '--diff-filter=U')
                   await git(path, 'merge', '--abort').catch(overshadowed)
-                  await fail(reason, conflicts, hint)
+                  if (conflicts) await fail(reason, conflicts, hint)
+                  else
+                    await fail(
+                      'the merge failed without conflicts',
+                      failure(error),
+                      'Fix what Git reports (often a commit hook or commit signing), then submit again.',
+                    )
                   return true
                 }
               }

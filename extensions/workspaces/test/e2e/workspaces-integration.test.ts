@@ -1234,6 +1234,30 @@ it.concurrent('does not record a failed landing in the message log', async () =>
   await submitted(f, id)
   expect(await messageLog(f)).toEqual([])
 })
+it.concurrent('reports why Git refused a merge commit that has no conflicts', async () => {
+  const f = await lander({})
+  const id = await f.create()
+  await f.service.ready(id, context)
+  await commit((await f.service.get(id, context))!.path, 'signed.txt')
+  await commit(f.projectRoot, 'moved.txt')
+  // The lander's checkout shares this config: its merge commit must be signed, and signing fails.
+  await git(f.projectRoot, 'config', 'commit.gpgsign', 'true')
+  await git(f.projectRoot, 'config', 'gpg.format', 'openpgp')
+  await git(f.projectRoot, 'config', 'gpg.program', 'false')
+  const before = await git(f.projectRoot, 'rev-parse', 'main')
+  const { id: submission } = await f.service.submit(id, 'None', context)
+  const [report] = await submitted(f, id)
+  expect(report).toContain('was not landed: the merge failed without conflicts:')
+  expect(report).toContain('failed to write commit object')
+  expect(report).not.toContain('conflicts with main')
+  const index = (await f.opened.harness.snapshot(Workspaces, ROOT_CONVERSATION_ID, context))!
+  expect(index.results[submission]).toMatchObject({
+    outcome: 'failed',
+    reason: 'the merge failed without conflicts',
+    output: expect.stringContaining('gpg failed to sign the data'),
+  })
+  expect(await git(f.projectRoot, 'rev-parse', 'main')).toBe(before)
+})
 it.concurrent('lands two submissions in order onto a moved target and reports both', async () => {
   const f = await lander({ checks: ['test -f base.txt'] })
   const first = await f.create()

@@ -158,7 +158,8 @@ lander's sidebar row shows the feature it lands or landed last.
 
 1. Resets its own detached checkout, `<home>/lander/<hash of source>`, to the target branch tip. `isolates.worktree.setup`
    runs once when the checkout is created. With `lander.push`, it fetches the remote branch and merges it when it is ahead.
-2. Merges the submitted tip. A conflict aborts the merge and reports the conflicting paths to the submitter.
+2. Merges the submitted tip. A conflict aborts the merge and reports the conflicting paths to the submitter; a merge
+   that fails without conflicts (a commit hook or commit signing refused the merge commit) reports Git's output tail.
 3. Runs `lander.checks` in order. Each check is stopped after 2 minutes without output or 10 minutes total, or at
    its own `timeout` (seconds, which also caps the no-output limit), killing its whole process group. Watchdog
    failures name the limit that fired, the failed test lines seen so far (vitest's `FAIL`/`×` lines, kept even when
