@@ -1258,6 +1258,29 @@ it.concurrent('reports why Git refused a merge commit that has no conflicts', as
   })
   expect(await git(f.projectRoot, 'rev-parse', 'main')).toBe(before)
 })
+it.concurrent('writes merge subjects that a conventional-commit hook lets through', async () => {
+  const f = await lander({})
+  const id = await f.create()
+  await f.service.ready(id, context)
+  await commit((await f.service.get(id, context))!.path, 'hooked.txt')
+  await commit(f.projectRoot, 'moved.txt')
+  // As hk's check-conventional-commit: only Git's own merge subjects pass without a commit type.
+  await writeFile(
+    join(f.projectRoot, '.git/hooks/commit-msg'),
+    `#!/bin/sh
+case "$(head -n1 "$1")" in "Merge commit '"* | "Merge remote-tracking branch '"*) exit 0 ;; esac
+echo "Invalid commit type" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  )
+  await f.service.submit(id, 'None', context)
+  const [report] = await submitted(f, id)
+  expect(report).toContain('landed as')
+  expect(await git(f.projectRoot, 'log', '-1', '--format=%s')).toMatch(
+    new RegExp(`^Merge commit '[0-9a-f]{7}' from #${id} into main$`),
+  )
+})
 it.concurrent('lands two submissions in order onto a moved target and reports both', async () => {
   const f = await lander({ checks: ['test -f base.txt'] })
   const first = await f.create()

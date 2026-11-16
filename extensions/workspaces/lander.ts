@@ -621,7 +621,7 @@ export function createLander(
                     if (
                       await merge(
                         fetched,
-                        `Merge ${settings.push}/${target}`,
+                        `Merge remote-tracking branch '${settings.push}/${target}'`,
                         `${settings.push}/${target} conflicts with local ${target} in`,
                         `Reconcile ${settings.push}/${target} with local ${target}, then submit again.`,
                       )
@@ -634,8 +634,9 @@ export function createLander(
               if (
                 await merge(
                   entry.tip,
-                  // The trailer labels the landing in first-parent catch-up rows (lineage/catchup.ts).
-                  `Merge ${entry.tip.slice(0, 7)} from #${entry.conversationId} into ${target}\n\nUltimate-Conversation: ${entry.conversationId}`,
+                  // The trailer labels the landing in first-parent catch-up rows (lineage/catchup.ts). The subject
+                  // starts as Git's own merge subjects do, which commit-message hooks such as hk's let through.
+                  `Merge commit '${entry.tip.slice(0, 7)}' from #${entry.conversationId} into ${target}\n\nUltimate-Conversation: ${entry.conversationId}`,
                   `it conflicts with ${target} in`,
                   `Merge ${target} into your workspace, resolve, verify and submit again.`,
                 )
