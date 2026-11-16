@@ -107,6 +107,12 @@ export type MessagesService = {
    * `automations.fired` input whose data carries it routes the woken run's final answer to that agent (route.ts).
    */
   owed(tx: Tx, to: ConversationId): Promise<Serves | undefined>
+  /**
+   * Inside `tx`, record conversation `by` as the starter of branch `branch` (`board.started`), as the `branch` tool does:
+   * its reports and answers then reach `by`, and `by`'s answers to them route back down. Records the request `by` still
+   * owes (`serves`) too.
+   */
+  started(tx: Tx, branch: ConversationId, by: ConversationId): Promise<void>
 }
 export { MessageSent } from './refs.ts'
 export type { Question, Serves } from './refs.ts'

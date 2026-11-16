@@ -42,6 +42,7 @@ import { Messages, MessageSent } from '../api.ts'
 import { send as sendMessage } from '../send.ts'
 import { UserInputEvent } from '../../../shared/events.ts'
 import type { MessagesService } from '../api.ts'
+import { starterOf } from '../addresses.ts'
 import { BranchReceipts, Tally, rootOf, startBranch } from '../../lineage/server.ts'
 import type { BranchInput } from '../../lineage/server.ts'
 import { Branch, Roots } from '../../lineage/api.ts'
@@ -1454,6 +1455,30 @@ it("routes a branch's later final answer to its starter once, waking it when the
   await f.open()
   await b.settled()
   expect(await b.from()).toHaveLength(2)
+})
+it('routes the final answer of a branch another extension forked and marked started to its starter', async () => {
+  const f = await fixture()
+  await f.opened.harness.commit(async (tx) => {
+    ;(await tx.doc(Roots, ROOT_CONVERSATION_ID)).roots = [1 as ConversationId]
+  }, context)
+  const by = ROOT_CONVERSATION_ID
+  // A root with history: an empty one would become a tally, which takes no inputs.
+  await (await f.opened.root.submit({ type: 'input', content: 'Hello' }, context)).wait(context)
+  const { id } = await startBranch(
+    f.host,
+    { from: by, prompt: 'Pick up', isolated: false, deliver: false, by },
+    context,
+  )
+  await f.opened.harness.commit((tx) => f.service().started(tx, id, by), context)
+  expect(await starterOf(f.host, id, context)).toBe(by)
+  const branch = (await f.opened.harness.conversation(id, context))!
+  await (await branch.submit({ type: 'input', content: 'Picked up' }, context)).wait(context)
+  await until(async () => (await f.log())!.messages.some((m) => m.from === id && m.report))
+  expect((await f.log())!.messages.find((m) => m.from === id)).toMatchObject({
+    to: by,
+    text: 'Answer: Picked up',
+    report: true,
+  })
 })
 it("leaves a branch's final answer as a note while its work is under way", async () => {
   const f = await fixture()

@@ -16,7 +16,7 @@ import { LineageApi, Roots } from '../lineage/api.ts'
 import { actingAs } from '../../lib/acting-as.ts'
 import { imagesParameter } from './images.ts'
 import { send } from './send.ts'
-import { owedRequest, Started } from './addresses.ts'
+import { markStarted } from './addresses.ts'
 import { safeToRerun } from '../../lib/replay.ts'
 
 export const branchTool = (host: ExtensionHost) =>
@@ -100,13 +100,7 @@ export const branchTool = (host: ExtensionHost) =>
           })
           ;(await tx.doc(host.metadata, branch.id)).label = 'coordinator'
           ;(await tx.doc(Family, branch.id)).name = definitionFamily(coordinator, change)
-          const started = await tx.doc(Started, branch.id)
-          started.by = from
-          // An agent's request the starter still owes an answer is what the branch works on: its result reaches that
-          // agent once it is concluded (route.ts). Without the link, a result routed to a concluded branch reached no
-          // one (danielgriesser.com #13859/15161, @writer's briefing).
-          const serves = await owedRequest(tx, from)
-          if (serves) started.serves = serves
+          await markStarted(tx, branch.id, from)
         }, ctx)
         id = await api.memo('branch-id', branch.id, ctx)
       }

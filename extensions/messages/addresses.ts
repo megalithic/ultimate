@@ -39,6 +39,17 @@ export const Started = defineDoc<{ by?: ConversationId; yielded?: TaskId; serves
   fork: 'initial',
   initial: () => ({}),
 })
+/**
+ * Inside `tx`, record `by` as the starter of branch `branch`, with the request `by` still owes as what the branch
+ * serves: its result reaches that agent once the branch is concluded (route.ts). Without the link, a result routed to
+ * a concluded branch reached no one (danielgriesser.com #13859/15161, @writer's briefing).
+ */
+export async function markStarted(tx: Tx, branch: ConversationId, by: ConversationId) {
+  const started = await tx.doc(Started, branch)
+  started.by = by
+  const serves = await owedRequest(tx, by)
+  if (serves) started.serves = serves
+}
 /** The conversation that started branch `id`, which hears its final answers; undefined for anything else. */
 export async function starterOf(host: ExtensionHost, id: ConversationId | 'user', ctx: Context) {
   if (typeof id !== 'number') return undefined
