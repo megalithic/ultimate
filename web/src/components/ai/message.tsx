@@ -1,9 +1,10 @@
 // Adapted from vercel/ai-elements packages/elements/src/message.tsx (Apache-2.0, see LICENSE).
 // Changes: `from` is a plain role, no branches or actions; only the code plugin; denser typography; links go through
-// the extensions' `link` renderers, inline code through their `inlineCode` renderers.
+// the extensions' `link` renderers, inline code through their `inlineCode` renderers; long code blocks fold.
 import { cn } from 'cn'
+import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import type { ComponentProps, HTMLAttributes, ReactNode } from 'react'
-import { memo, useMemo } from 'react'
+import { isValidElement, memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CodeBlock,
   CodeBlockCopyButton,
@@ -114,7 +115,96 @@ function InlineCode(props: ComponentProps<'code'> & ExtraProps) {
   )
 }
 
-const components = { a: Link, inlineCode: InlineCode }
+/** The text of a fenced block as Streamdown hands it over: a string, or a `code` element holding one. */
+function blockText(children: ReactNode) {
+  if (typeof children === 'string') return children
+  if (
+    isValidElement<{ children?: unknown }>(children) &&
+    typeof children.props.children === 'string'
+  )
+    return children.props.children
+  return ''
+}
+
+const CoreBlock = defaultComponents.code
+/** A fenced code block: folded unless an extension renders its language, which then owns the block whole. */
+function FencedCode(props: ComponentProps<'code'> & ExtraProps) {
+  const languages = codeBlockLanguages(useExtensions())
+  const language = /language-(\S+)/.exec(props.className ?? '')?.[1]
+  if (language !== undefined && languages.includes(language))
+    return CoreBlock ? <CoreBlock {...props} /> : null
+  return <FoldedCode {...props} />
+}
+
+/**
+ * A fenced code block that overflows Streamdown's height limit fades out over a toggle that shows all of it, and folds
+ * back. A block within the limit shows as it is.
+ */
+function FoldedCode(props: ComponentProps<'code'> & ExtraProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [overflows, setOverflows] = useState(false)
+  const [open, setOpen] = useState(false)
+  const lines = blockText(props.children).replace(/\n$/, '').split('\n').length
+  useEffect(() => {
+    const block = ref.current
+    if (!block || open) return undefined
+    // The body is swapped once highlighted, and laid out only on screen (`content-visibility: auto`): measure on
+    // every resize of the block.
+    const measure = () => {
+      const body = block.querySelector('[data-streamdown="code-block-body"]')
+      setOverflows(!!body && body.scrollHeight > body.clientHeight + 1)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(block)
+    return () => observer.disconnect()
+  }, [open, lines])
+  if (!overflows) return <div ref={ref}>{CoreBlock && <CoreBlock {...props} />}</div>
+  const toggle = () => {
+    setOpen(!open)
+    // Folding a long block back leaves its top above the window: bring it back into view.
+    if (open) requestAnimationFrame(() => ref.current?.scrollIntoView({ block: 'nearest' }))
+  }
+  return (
+    <div
+      className={cn(
+        'relative',
+        open &&
+          '[&_[data-streamdown=code-block-body]]:max-h-none! [&_[data-streamdown=code-block-body]]:pb-10!',
+      )}
+      ref={ref}
+    >
+      {CoreBlock && <CoreBlock {...props} />}
+      <div
+        className={cn(
+          'pointer-events-none absolute inset-x-px bottom-px flex justify-center rounded-b-md pb-2',
+          !open && 'h-20 items-end bg-linear-to-t from-terminal via-terminal/85 to-transparent',
+        )}
+      >
+        <button
+          aria-expanded={open}
+          className="pointer-events-auto flex items-center gap-1 rounded-full border border-border/80 bg-background/90 px-2.5 py-0.5 font-mono text-[11px] text-muted-foreground shadow-sm hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+          onClick={toggle}
+          type="button"
+        >
+          {open ? (
+            <>
+              <ChevronUpIcon className="size-3" />
+              Collapse
+            </>
+          ) : (
+            <>
+              <ChevronDownIcon className="size-3" />
+              Expand · {lines} lines
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const components = { a: Link, inlineCode: InlineCode, code: FencedCode }
 // After GFM, so autolinked URLs are links already and keep their `#fragment`.
 const remarkPlugins = [...Object.values(defaultRemarkPlugins), remarkMentions]
 
