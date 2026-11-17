@@ -37,8 +37,8 @@ with a line listing it by its questions (see [Messages](../messages/README.md)).
 ## Card
 
 Under the outgoing `message` card in the asker's transcript, through messages’ `MessageAnswers` point. One question is
-open at a time; the others fold to a line with their answer (`1b drop them`) or “not answered”, and a dot per question
-shows progress. Kinds: `choice` (one option), `multi` (any), `confirm` (Yes/No), `scale` (numbered steps with end
+open at a time, its text rendered as Markdown (code blocks highlighted, with copy); the others fold to their text's
+first line with their answer (`1b drop them`) or “not answered”, and a dot per question shows progress. Kinds: `choice` (one option), `multi` (any), `confirm` (Yes/No), `scale` (numbered steps with end
 labels) and `text` (a field); options offer “Something else…” with an inline field, and an option's Markdown `preview`
 shows beside the options for the hovered or chosen one. Recommended options (@ultimate's picks, also on a branch's card) carry a “my pick” chip. Under the questions,
 a note field is always there: whatever it holds goes after the answer lines, or on its own (“Send note”), and never

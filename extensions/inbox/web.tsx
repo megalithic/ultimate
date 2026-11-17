@@ -106,7 +106,7 @@ function Row({
   onSelect: () => void
 }) {
   const questions = entry.message?.questions
-  const gist = entry.item ? entry.item.gist : questions?.[0]?.text
+  const gist = entry.item ? entry.item.gist : questions?.[0]?.text.split('\n')[0]
   const more = (questions?.length ?? 0) > 1 ? ` +${questions!.length - 1}` : ''
   return (
     <button

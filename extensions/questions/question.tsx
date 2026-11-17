@@ -231,6 +231,22 @@ export function QuestionItem({
       list.findIndex((choice) => choice.recommended),
     )
   const multi = question.kind === 'multi'
+  // A folded question and its legend name it by its first line; the open one shows it whole, as Markdown.
+  const line = question.text.split('\n')[0]
+  const badge = (
+    <span
+      className={cn(
+        'flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] transition-colors duration-200',
+        done
+          ? 'bg-brand/15 text-brand'
+          : current
+            ? 'border border-foreground/30 text-foreground'
+            : 'border border-dashed border-muted-foreground/40 text-muted-foreground',
+      )}
+    >
+      {done && !current ? <Check className="size-2.5" /> : position(question, index)}
+    </span>
+  )
   const field = (label: string, placeholder: string, autoFocus?: boolean) => (
     <Field
       value={draft?.text ?? ''}
@@ -282,38 +298,32 @@ export function QuestionItem({
         current ? 'border-border/80 bg-background/50' : 'border-transparent',
       )}
     >
-      <legend className="sr-only">{question.text}</legend>
-      <button
-        type="button"
-        tabIndex={current ? -1 : 0}
-        aria-expanded={current}
-        onClick={onOpen}
-        className={cn(
-          'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
-          current ? 'cursor-default' : 'cursor-pointer hover:bg-muted/40',
-        )}
-      >
-        <span
-          className={cn(
-            'flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] transition-colors duration-200',
-            done
-              ? 'bg-brand/15 text-brand'
-              : current
-                ? 'border border-foreground/30 text-foreground'
-                : 'border border-dashed border-muted-foreground/40 text-muted-foreground',
+      <legend className="sr-only">{line}</legend>
+      {current ? (
+        // Not a button: the Markdown may carry links and code blocks with their copy button.
+        <div className="flex w-full items-start gap-2.5 px-2.5 py-2">
+          {badge}
+          {/* Card text, not transcript prose: the `!` keeps it so inside the transcript's `.markdown` rule. */}
+          <MessageResponse className="min-w-0 flex-1 py-px text-[13px]! leading-snug! tracking-normal! text-foreground [font-feature-settings:'cv11','ss03']!">
+            {question.text}
+          </MessageResponse>
+          {multi && (
+            <span className="flex h-5 shrink-0 items-center font-mono text-[11px] text-muted-foreground">
+              pick any
+            </span>
           )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          aria-expanded={false}
+          onClick={onOpen}
+          className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50"
         >
-          {done && !current ? <Check className="size-2.5" /> : position(question, index)}
-        </span>
-        <span
-          className={cn(
-            'min-w-0 text-[13px] leading-snug',
-            current ? 'flex-1 text-foreground' : 'shrink truncate text-foreground/85',
-          )}
-        >
-          {question.text}
-        </span>
-        {!current && (
+          {badge}
+          <span className="min-w-0 shrink truncate text-[13px] leading-snug text-foreground/85">
+            {line}
+          </span>
           <span
             className={cn(
               'ml-auto flex min-w-0 shrink-[2] items-center gap-1.5 font-mono text-[11px]',
@@ -331,11 +341,8 @@ export function QuestionItem({
               <span className="whitespace-nowrap">not answered</span>
             )}
           </span>
-        )}
-        {current && multi && (
-          <span className="shrink-0 font-mono text-[11px] text-muted-foreground">pick any</span>
-        )}
-      </button>
+        </button>
+      )}
       <div
         className={cn(
           'grid transition-[grid-template-rows] duration-200 ease-out',

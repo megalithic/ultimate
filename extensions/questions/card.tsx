@@ -438,7 +438,9 @@ function Card({
         event.altKey ||
         target?.closest('input, textarea, select, [contenteditable="true"]') ||
         // Outside this card, another card or a control keeps its own keys.
-        (!root.current?.contains(target) && target?.closest('[data-questions-card], button, a'))
+        (!root.current?.contains(target) && target?.closest('[data-questions-card], button, a')) ||
+        // A link or button in a question's Markdown (Copy, Expand) keeps Enter.
+        (event.key === 'Enter' && target?.closest('.markdown :is(a, button)'))
       )
         return
       if (phase === 'undo') {

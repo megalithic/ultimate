@@ -27,7 +27,11 @@ const optionSchema = obj({
 /** The `questions` parameter of the `message` tool. */
 export const questionsParameter = arr(
   obj({
-    text: str({ minLength: 1 }),
+    text: str({
+      minLength: 1,
+      description:
+        'The question in one short plain line. Code, commands, snippets and what to paste back go in the message text, which renders as Markdown with highlighted, copyable code blocks.',
+    }),
     kind: strEnum(['choice', 'multi', 'confirm', 'text', 'scale']),
     ref: opt(str({ pattern: '^\\d+$', description: 'Its number, "2".' })),
     options: opt(arr(optionSchema)),

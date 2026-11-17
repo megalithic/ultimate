@@ -230,7 +230,7 @@ export async function send(
               from,
               ...(callId === undefined ? {} : { call: callId }),
               summary: questions?.length
-                ? `asks you ${questions.length} question${questions.length === 1 ? '' : 's'} · ${questions[0].text}`
+                ? `asks you ${questions.length} question${questions.length === 1 ? '' : 's'} · ${questions[0].text.split('\n')[0]}`
                 : `asks you · ${input.text.split('\n')[0]}`,
             },
             content: `#${from} asked the user (message ${message.id}): ${gist(message)}. The user answers there; their answer reaches you as a note.`,
