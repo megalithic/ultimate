@@ -65,6 +65,8 @@ export interface SurfaceContribution {
   /** Position after Agent in the switcher, ⌘K, and `mod+1…9`; lower first (default 0), then by title. */
   order?: number
   component: ComponentType
+  /** A small component after the title in the title bar's tab, such as a count of what waits there; render nothing to show none. */
+  badge?: ComponentType
 }
 
 /** One tool call as the transcript sees it: the model's call, live progress, and the result. */
@@ -352,8 +354,8 @@ export interface WebExtension {
   inlineCode?: InlineCodeRenderer
   /** Fenced code block renderers by language; they compose in discovery order, each wrapping the one before it. */
   codeBlocks?: Readonly<Record<string, CodeBlockRenderer>>
-  /** Contributions to the hover action row on stored messages, in discovery order. */
-  messageActions?: readonly ComponentType<{ entry: EntryRecord }>[]
+  /** Contributions to the hover action row on stored messages, in discovery order; `text` is what Copy message copies. */
+  messageActions?: readonly ComponentType<{ entry: EntryRecord; text: string }>[]
   /** Readouts on the hover action row on stored messages, before its time, in discovery order. */
   messageDetails?: readonly ComponentType<{ entry: EntryRecord }>[]
   /** Inline labels after the Final answer heading on stored assistant messages. */

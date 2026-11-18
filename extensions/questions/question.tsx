@@ -7,7 +7,6 @@ import type { Question } from '../messages/refs.ts'
 import { answerOf, choices, keyOf, position } from './state.tsx'
 import type { Choice, Draft } from './state.tsx'
 
-/** A check that pops in when it mounts: the moment a choice lands. */
 const Check = ({ className }: { className?: string }) => (
   <CheckIcon
     strokeWidth={3}
@@ -18,10 +17,6 @@ const Check = ({ className }: { className?: string }) => (
   />
 )
 
-/**
- * The key hint that becomes the selection mark: a letter in a quiet box, filled with a check once chosen. Round for one
- * answer, square for several.
- */
 function Mark({ hint, chosen, multi }: { hint?: string; chosen: boolean; multi: boolean }) {
   return (
     <span
@@ -39,7 +34,6 @@ function Mark({ hint, chosen, multi }: { hint?: string; chosen: boolean; multi: 
   )
 }
 
-/** The field for a typed answer: Enter goes on, Esc hands the keys back to the card, ↑/↓ move between questions. */
 function Field({
   value,
   label,
@@ -72,7 +66,6 @@ function Field({
   )
 }
 
-/** One option as a full-width row: its key mark, label and detail, and @ultimate's pick when it is one. */
 function Option({
   choice,
   hint,
@@ -129,7 +122,6 @@ function Option({
   )
 }
 
-/** A rating: numbered steps that fill up to the chosen one, with the ends named underneath. */
 function Scale({
   question,
   draft,
@@ -179,8 +171,7 @@ function Scale({
   )
 }
 
-/** The short form of an answer for a folded question or the settled card: "1a", "2a,c" or "5", and its words. */
-export function brief(question: Question, index: number, draft: Draft | undefined) {
+function brief(question: Question, index: number, draft: Draft | undefined) {
   const list = choices(question)
   const keys =
     question.kind === 'scale' || draft?.other
@@ -191,10 +182,9 @@ export function brief(question: Question, index: number, draft: Draft | undefine
   return { tag: `${position(question, index)}${keys}`, words: answerOf(question, draft) }
 }
 
-/**
- * One question on the card. The current one is open with its options; the others fold to a line with their answer, or
- * "not answered", and open on a click. The body folds by animating its grid row, so the card's height eases.
- */
+const previewPinnedToOptionsHeight =
+  'flex min-w-0 flex-col rounded-md border border-border/70 bg-background/70 @lg:absolute @lg:inset-0'
+
 export function QuestionItem({
   question,
   index,
@@ -231,8 +221,7 @@ export function QuestionItem({
       list.findIndex((choice) => choice.recommended),
     )
   const multi = question.kind === 'multi'
-  // A folded question and its legend name it by its first line; the open one shows it whole, as Markdown.
-  const line = question.text.split('\n')[0]
+  const firstLine = question.text.split('\n')[0]
   const badge = (
     <span
       className={cn(
@@ -298,12 +287,10 @@ export function QuestionItem({
         current ? 'border-border/80 bg-background/50' : 'border-transparent',
       )}
     >
-      <legend className="sr-only">{line}</legend>
+      <legend className="sr-only">{firstLine}</legend>
       {current ? (
-        // Not a button: the Markdown may carry links and code blocks with their copy button.
         <div className="flex w-full items-start gap-2.5 px-2.5 py-2">
           {badge}
-          {/* Card text, not transcript prose: the `!` keeps it so inside the transcript's `.markdown` rule. */}
           <MessageResponse className="min-w-0 flex-1 py-px text-[13px]! leading-snug! tracking-normal! text-foreground [font-feature-settings:'cv11','ss03']!">
             {question.text}
           </MessageResponse>
@@ -322,7 +309,7 @@ export function QuestionItem({
         >
           {badge}
           <span className="min-w-0 shrink truncate text-[13px] leading-snug text-foreground/85">
-            {line}
+            {firstLine}
           </span>
           <span
             className={cn(
@@ -359,11 +346,10 @@ export function QuestionItem({
             ) : question.kind === 'scale' ? (
               <Scale question={question} draft={draft} onSelect={onSelect} />
             ) : previews ? (
-              // Side by side, the preview fills the options' height and scrolls inside, so hovering never moves them.
               <div className="grid gap-2 @lg:grid-cols-2">
                 {options}
                 <div className="relative min-h-24 min-w-0">
-                  <div className="flex min-w-0 flex-col rounded-md border border-border/70 bg-background/70 @lg:absolute @lg:inset-0">
+                  <div className={previewPinnedToOptionsHeight}>
                     <div className="border-b border-border/60 px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
                       preview · {list[shown]?.label}
                     </div>
