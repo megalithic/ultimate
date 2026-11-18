@@ -67,11 +67,23 @@ function givenOnLine(question: Question, number: string | undefined, line: strin
       : new RegExp(`^${number}([a-z](?:,[a-z])*)?(?:[.:]\\s*(.*))?$`).exec(line)
   if (numbered) {
     const keys = numbered[1]?.split(',') ?? []
-    const labels = keys.flatMap(
-      (key) => (question.options ?? []).find((option) => option.key === key)?.label ?? [],
-    )
-    if (keys.length && labels.length === keys.length)
-      return question.kind === 'multi' ? labels : labels.join(', ')
+    const listed =
+      question.kind === 'confirm'
+        ? [
+            { label: 'Yes', key: 'y' },
+            { label: 'No', key: 'n' },
+          ]
+        : (question.options ?? [])
+    const options = listed.map((option, at) => ({
+      ...option,
+      key: option.key ?? String.fromCharCode(97 + at),
+    }))
+    const labels = keys.map((key) => {
+      const option = options.find((candidate) => candidate.key === key)
+      if (!option) throw new Error(`Question ${number} has no option ${key}`)
+      return option.label
+    })
+    if (labels.length) return question.kind === 'multi' ? labels : labels.join(', ')
     const words = numbered[2]?.trim() ?? ''
     const titled = `${question.text.split('\n')[0]}:`
     return (words.startsWith(titled) ? words.slice(titled.length).trim() : words) || undefined

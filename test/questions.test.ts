@@ -537,6 +537,10 @@ describe('settling for the user', () => {
           JSON.stringify(entry.model).includes('questions 1, 2 are still open on the card'),
       ),
     ).toBe(true)
+    // A misnamed option names a question too: refused, never the whole message.
+    await expect(f.settle(id, { messageId: message!.id, text: '1z' })).rejects.toThrow(
+      'Question 1 has no option z',
+    )
     // A repeated answer names a question, so it never settles the whole message.
     await expect(f.settle(id, { messageId: message!.id, text: '3: Yes' })).rejects.toThrow(
       'Question 3 is already answered',
@@ -614,6 +618,13 @@ describe('answer text', () => {
     ]
     expect(answersNamedAtLineStart('2: Small', mixed)).toEqual({ 0: 'Small' })
     expect(answersNamedAtLineStart('Colour: red\n1: big', mixed)).toEqual({ 1: 'red' })
+    // Keyless options go by the letters voice reads out; a confirmation by y/n.
+    const keyless: Question[] = [
+      { text: 'Pick', kind: 'choice', ref: '1', options: [{ label: 'x' }, { label: 'y' }] },
+      { text: 'Ship?', kind: 'confirm', ref: '2' },
+    ]
+    expect(answersNamedAtLineStart('1b\n2y', keyless)).toEqual({ 0: 'y', 1: 'Yes' })
+    expect(() => answersNamedAtLineStart('1z', keyless)).toThrow('Question 1 has no option z')
   })
 
   it('drops fields that do not apply to a kind and trims what it keeps', () => {
