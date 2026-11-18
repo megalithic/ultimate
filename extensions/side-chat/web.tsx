@@ -532,7 +532,14 @@ function PinnedQuestion({
   const [folded, setFolded] = useState(true)
   if (!message) return null
   const questions = message.questions ?? []
-  const ready = answered(questions, cardOf(cards, cardKey(id), questions).drafts).length
+  const sent = message.answered ?? {}
+  const unsent = Object.fromEntries(
+    Object.entries(cardOf(cards, cardKey(id), questions).drafts).filter(
+      ([index]) => !(index in sent),
+    ),
+  )
+  const ready = answered(questions, unsent).length
+  const openCount = questions.length - Object.keys(sent).length
   const waits = message.state === 'delivered'
   const settled =
     message.state === 'dismissed'
@@ -558,7 +565,7 @@ function PinnedQuestion({
         {waits && folded && (
           <span className="shrink-0 text-brand">
             {questions.length
-              ? `${ready}/${questions.length} · ${ready ? 'review & send' : 'answer'}`
+              ? `${ready}/${openCount} · ${ready ? 'review & send' : 'answer'}`
               : 'answer'}
           </span>
         )}

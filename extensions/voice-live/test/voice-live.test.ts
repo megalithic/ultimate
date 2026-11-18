@@ -566,6 +566,13 @@ it('reads only the questions still open, in their own numbering, after naming th
     { 0: 'Inbox' },
   )
   expect(text).toBe('Already answered: 1.\n\n2. Ship it?')
+  // A position another question holds as its ref is no number: the question goes by its text.
+  expect(
+    questionsText([
+      { text: 'Size', kind: 'text', ref: '2' },
+      { text: 'Colour', kind: 'text' },
+    ]),
+  ).toBe('2. Size\n\nColour (unnumbered: answer it as "Colour: …")')
 })
 
 const voiceAnswer = (f: Fixture) =>

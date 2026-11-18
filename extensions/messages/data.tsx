@@ -286,8 +286,8 @@ export function counterparts(
   ]
 }
 
-export const answerTo = (messages: readonly Message[], question: Message) =>
-  messages.find((m) => m.from === 'user' && m.re === question.id)
+export const answersTo = (messages: readonly Message[], question: Message) =>
+  messages.filter((m) => m.from === 'user' && m.re === question.id)
 
 export function openMessages(
   messages: readonly Message[],

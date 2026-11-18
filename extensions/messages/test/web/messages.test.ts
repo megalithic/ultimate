@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { accentOf } from '../../accent.tsx'
 import { callerOf } from '../../caller.ts'
 import {
-  answerTo,
+  answersTo,
   answeredMessages,
   backgroundRow,
   conversationState,
@@ -402,9 +402,11 @@ describe("background in @ultimate's compact transcript", () => {
     expect(counterparts(row('pi.assistant', undefined, said('stop')), messagesLog)).toEqual([4])
   })
 
-  it('pairs a question with your answer', () => {
-    expect(answerTo(log, log[1])?.id).toBe(3)
-    expect(answerTo(log, log[3])).toBeUndefined()
+  it('pairs a question with each of your answers, a note and a later answer alike', () => {
+    expect(answersTo(log, log[1]).map((m) => m.id)).toEqual([3])
+    const later = { ...log[2], id: 5 }
+    expect(answersTo([...log, later], log[1]).map((m) => m.id)).toEqual([3, 5])
+    expect(answersTo(log, log[3])).toEqual([])
   })
 })
 

@@ -60,7 +60,7 @@ export function optionLetters(options: readonly { key?: string }[]) {
   return options.map((option) => option.key ?? free[next++] ?? '')
 }
 
-function numberOf(questions: readonly Question[], index: number) {
+export function numberOf(questions: readonly Question[], index: number) {
   const own = questions[index].ref
   if (own !== undefined) return own
   const shown = String(index + 1)

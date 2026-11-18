@@ -12,16 +12,18 @@ export const QuestionPointer = renderEntry(AskedEntry, function QuestionPointer(
     (conversation) =>
       conversation.entries
         .filter((candidate) => AnsweredEntry.is(candidate))
-        .find((e) => e.data.message === id)?.data,
+        .findLast((e) => e.data.message === id)?.data,
   )
   const message = useDocOf(ROOT, MessagesDoc)?.messages.find((m) => m.id === id)
-  const open = !transcriptOutcome && message !== undefined && openQuestion(message)
+  const open = message !== undefined && openQuestion(message)
   const accent = useAccentOf(from)
   const { showSurface, switchConversation } = useUltimate()
   const [state, text] = transcriptOutcome
-    ? transcriptOutcome.dismissed
-      ? [transcriptOutcome.via ? 'dismissed for you' : 'dismissed', undefined]
-      : [transcriptOutcome.via ? 'answered for you' : 'answered', transcriptOutcome.summary]
+    ? open
+      ? ['partly answered', transcriptOutcome.summary]
+      : transcriptOutcome.dismissed
+        ? [transcriptOutcome.via ? 'dismissed for you' : 'dismissed', undefined]
+        : [transcriptOutcome.via ? 'answered for you' : 'answered', transcriptOutcome.summary]
     : [undefined, summary]
   return (
     <Card attention={open} data-message-pointer={id}>

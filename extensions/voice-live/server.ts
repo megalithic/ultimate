@@ -32,7 +32,7 @@ import { formatAgo } from '../../lib/ago.ts'
 import { openQuestion } from '../../lib/message-state.ts'
 import { Messages, MessagesApi } from '../messages/api.ts'
 import type { Message, Question } from '../messages/api.ts'
-import { optionLetters } from '../../lib/question-answers.ts'
+import { numberOf, optionLetters } from '../../lib/question-answers.ts'
 import { Standing, SubagentsApi } from '../subagents/api.ts'
 import { ConversationsApi } from '../conversations/api.ts'
 import { LineageApi } from '../lineage/api.ts'
@@ -182,7 +182,8 @@ async function writeDisplayOnlyEntry(
 }
 
 export function questionsText(questions: Question[], answered: Message['answered'] = {}) {
-  const answeredRefs = questions.flatMap((q, i) => (i in answered ? [q.ref ?? String(i + 1)] : []))
+  const named = (q: Question, i: number) => numberOf(questions, i) ?? `"${q.text}"`
+  const answeredRefs = questions.flatMap((q, i) => (i in answered ? [named(q, i)] : []))
   return [
     ...(answeredRefs.length ? [`Already answered: ${answeredRefs.join(', ')}.`] : []),
     ...questions.flatMap((q, i) =>
@@ -190,7 +191,9 @@ export function questionsText(questions: Question[], answered: Message['answered
         ? []
         : [
             [
-              `${q.ref ?? i + 1}. ${q.text}`,
+              numberOf(questions, i) === undefined
+                ? `${q.text} (unnumbered: answer it as "${q.text}: …")`
+                : `${numberOf(questions, i)}. ${q.text}`,
               ...(q.options ?? []).map(
                 (o, j, all) =>
                   `${optionLetters(all)[j]}: ${o.label}${o.detail ? ` — ${o.detail}` : ''}${o.recommended ? ' (the asker’s pick)' : ''}`,

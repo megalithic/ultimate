@@ -46,7 +46,7 @@ import { openAgentSource, StandingDoc } from '../subagents/ui.tsx'
 import { useWorkspaceIndex } from '../workspaces/ui.tsx'
 import { accentOf } from './accent.tsx'
 import {
-  answerTo,
+  answersTo,
   answeredMessages,
   backgroundRow,
   counterparts,
@@ -206,7 +206,7 @@ export function Bubble({
   const accent = useAccentOf(from)
   const status = sentStatus(message, running)
   const stored = entry?.model?.[0]
-  const answer = message && log ? answerTo(log.messages, message) : undefined
+  const answers = message && log ? answersTo(log.messages, message) : []
 
   const bodyAlreadyShowsWriting = running && !message && !text
 
@@ -262,7 +262,9 @@ export function Bubble({
       >
         {message?.images && <MessageImages conversation={from} entry={message.images.entry} />}
         {children}
-        {answer && <AttachedAnswer answer={answer} question={message!} />}
+        {answers.map((answer) => (
+          <AttachedAnswer answer={answer} key={answer.id} question={message!} />
+        ))}
         {(showAttentionOrFailureStatus || message?.error) && (
           <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
             {showAttentionOrFailureStatus && message ? (
