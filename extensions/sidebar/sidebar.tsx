@@ -529,12 +529,12 @@ function Tree({
       flightSubagents(branch.id),
     ],
   }))
-  const flightParents = openBranches
+  const flightParents: number[] = openBranches
     .map((branch) => branch.id)
     .filter((id) => childrenByParent.has(id))
   const anyFlightOpen =
     flightParents.some((id) => !folded.includes(id)) ||
-    expanded.some((id) => childrenByParent.has(id))
+    expanded.some((id) => childrenByParent.has(id) && !flightParents.includes(id))
   const toggleFlights =
     flightParents.length > 0 ? (
       <button
