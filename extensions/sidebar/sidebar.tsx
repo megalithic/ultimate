@@ -1,5 +1,5 @@
 import { ROOT } from '@/sdk'
-import { ChevronRightIcon } from 'lucide-react'
+import { ChevronRightIcon, ChevronsDownUpIcon, ChevronsUpDownIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
@@ -58,7 +58,7 @@ import { StandingDoc, talkToUltimate } from '../subagents/ui.tsx'
 import type { KeptWork } from '../conversations/types.ts'
 import { LanderState } from './lander.tsx'
 import { StandingPhase, WaitingOnUser } from './ultimate.tsx'
-import { useShell, useSidebarState } from './state.tsx'
+import { setAllSubagents, useShell, useSidebarState } from './state.tsx'
 import { topLevelRows } from './listed.ts'
 import { UnderUltimate, Unlisted } from './ui.tsx'
 
@@ -160,6 +160,7 @@ function Tree({
       ? overview[shownTop.id]
       : undefined
   const [expanded, setExpanded] = useSidebarState<number[]>('expanded', [])
+  const [folded, setFolded] = useSidebarState<number[]>('folded', [])
   const working = workingByTop(conversations)
   const topLevel = topLevelRows(conversations, new Set(unlisted.flatMap((set) => [...set])))
   const standingIds = useDocOf(ROOT, StandingDoc)
@@ -493,15 +494,61 @@ function Tree({
       />,
       ...subagentLines(child.id, depth + 1),
     ])
+  const flightSubagents = (id: number) => {
+    const lines = subagentLines(id)
+    if (!lines.length) return null
+    const open = !folded.includes(id)
+    return (
+      <Collapsible
+        key="subagents"
+        open={open}
+        onOpenChange={(next) =>
+          setFolded((previous) => [
+            ...previous.filter((parent) => parent !== id),
+            ...(next ? [] : [id]),
+          ])
+        }
+      >
+        <CollapsibleTrigger
+          aria-label={`Sub-agents of conversation ${id}`}
+          className="group/agents ml-5 flex cursor-pointer items-center gap-1 py-1 font-mono text-[10.5px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/agents:rotate-90" />
+          Sub-agents · {lines.length}
+        </CollapsibleTrigger>
+        <CollapsibleContent>{open && lines}</CollapsibleContent>
+      </Collapsible>
+    )
+  }
   const flights: Flight[] = openBranches.map((branch) => ({
     conversation: branch,
     working: working.has(branch.id),
     parked: parked.has(branch.id),
     subagents: [
       <EpicLine id={branch.id} key="epic" working={working.get(branch.id) === 'self'} />,
-      ...subagentLines(branch.id),
+      flightSubagents(branch.id),
     ],
   }))
+  const flightParents = openBranches
+    .map((branch) => branch.id)
+    .filter((id) => childrenByParent.has(id))
+  const anyFlightOpen = flightParents.some((id) => !folded.includes(id))
+  const toggleFlights =
+    flightParents.length > 0 ? (
+      <button
+        aria-label={anyFlightOpen ? 'Collapse all sub-agents' : 'Expand all sub-agents'}
+        className="flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+        onClick={() => setAllSubagents(!anyFlightOpen)}
+        title={anyFlightOpen ? 'Collapse all sub-agents' : 'Expand all sub-agents'}
+        type="button"
+      >
+        {anyFlightOpen ? (
+          <ChevronsDownUpIcon className="size-3" />
+        ) : (
+          <ChevronsUpDownIcon className="size-3" />
+        )}
+      </button>
+    ) : undefined
 
   return (
     <div className="flex flex-1 flex-col pb-2">
@@ -598,6 +645,7 @@ function Tree({
         )}
         <Slot name="sidebar.top" />
         <InFlight
+          action={toggleFlights}
           flights={flights}
           now={now}
           onConclude={(id, conclude) => void requestConclude(id, conclude)}

@@ -9,12 +9,14 @@ export function Section({
   label,
   count,
   rule,
+  action,
   children,
 }: {
   id: string
   label: string
   count: number
   rule?: boolean
+  action?: ReactNode
   children: ReactNode
 }) {
   const [closed, setClosed] = useSidebarState<string[]>('closedSections', [])
@@ -29,14 +31,17 @@ export function Section({
       }
       open={open}
     >
-      <CollapsibleTrigger
-        className="group/section mx-2 flex h-7 cursor-pointer items-center gap-1 rounded-md px-1 section-label outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-        data-ui="sidebar-section-header"
-      >
-        <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/section:rotate-90" />
-        {label}
-        <span className="text-muted-foreground/60 tabular-nums">{count}</span>
-      </CollapsibleTrigger>
+      <div className="mx-2 flex items-center">
+        <CollapsibleTrigger
+          className="group/section flex h-7 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 section-label outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          data-ui="sidebar-section-header"
+        >
+          <ChevronRightIcon className="size-3 transition-transform group-data-[state=open]/section:rotate-90" />
+          {label}
+          <span className="text-muted-foreground/60 tabular-nums">{count}</span>
+        </CollapsibleTrigger>
+        {open && action}
+      </div>
       <CollapsibleContent className="flex flex-col gap-0.5">{children}</CollapsibleContent>
     </Collapsible>
   )

@@ -112,6 +112,9 @@ During new work, an old activity is labeled Last reply.
 A child linked to a plan task leads with the plan's `TaskChip` and shows the task title instead of its activity.
 A row switches to its child, highlights selection and keeps the top-level summary visible. History forks are not
 invented delegation edges. Expansion is persisted in `ext.conversations.expanded`; buttons support keyboard access.
+An in-flight branch's sub-agents sit in their own Sub-agents group, open until folded (`ext.conversations.folded`).
+The In flight heading's caret (shown while open) and the ⌘K commands Collapse all sub-agents and Expand all
+sub-agents open or close every Sub-agents group at once, in flight and in the trees.
 
 @ultimate starts coordinator branches; there are no manual creation commands or isolation preferences. The sidebar
 header names the project and its path (`#<worktree>` in a branch checkout), the full path on hover; Info's first

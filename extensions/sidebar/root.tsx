@@ -371,11 +371,13 @@ export const stillOpen = (
   )
 
 export function InFlight({
+  action,
   flights,
   shownId,
   now,
   onConclude,
 }: {
+  action?: ReactNode
   flights: Flight[]
   shownId?: number
   now: number
@@ -384,7 +386,7 @@ export function InFlight({
   const work = useFlightWork(flights.map((flight) => flight.conversation))
   if (!flights.length) return null
   return (
-    <Section count={flights.length} id="in-flight" label="In flight">
+    <Section action={action} count={flights.length} id="in-flight" label="In flight">
       <ul className="flex flex-col gap-0.5">
         {flights.map((flight) => (
           <FlightRow
