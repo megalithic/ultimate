@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { list } from '../server.ts'
+import { actions, list, stopped } from '../server.ts'
 import type { ExtensionHost } from '../../../server/extensions.ts'
 import { temp } from '../../../test/helpers.ts'
 
@@ -37,6 +37,54 @@ it('lists running projects and this one, with their own counts, another instance
   } finally {
     other.close()
   }
+})
+
+it('lists stopped projects newest first, hides a forgotten one until it opens again, and marks the hub', async () => {
+  const userHome = await temp('ultimate-projects-')
+  await mkdir(join(userHome, '.ultimate'))
+  await writeFile(
+    join(userHome, '.ultimate/settings.json'),
+    JSON.stringify({ fleet: { primary: '~/hub' } }),
+  )
+  const registry = [
+    { name: 'here', home: '/h/here', current: true, conversations: [] },
+    {
+      name: 'running',
+      home: '/h/running',
+      current: false,
+      running: { pid: 2, url: 'http://127.0.0.1:1' },
+      conversations: [],
+    },
+    {
+      name: 'old',
+      home: '/h/old',
+      root: '/work/old',
+      openedAt: 100,
+      current: false,
+      conversations: [{ inputAt: 300, answerAt: 400 }],
+    },
+    {
+      name: 'hub',
+      home: '/h/hub',
+      root: join(userHome, 'hub'),
+      openedAt: 1_000,
+      current: false,
+      conversations: [],
+    },
+  ]
+  const host = { userHome, projects: async () => registry } as unknown as ExtensionHost
+  const context = { host } as unknown as Parameters<typeof actions.forget>[1]
+  expect(await stopped(host)).toEqual([
+    { name: 'hub', home: '/h/hub', root: join(userHome, 'hub'), lastActive: 1_000, hub: true },
+    { name: 'old', home: '/h/old', root: '/work/old', lastActive: 400 },
+  ])
+
+  await actions.forget({ home: '/h/old' }, context)
+  expect((await stopped(host)).map(({ name }) => name)).toEqual(['hub'])
+  await expect(actions.forget({ home: '/h/running' }, context)).rejects.toThrow('is running')
+
+  registry[2].openedAt = Date.now() + 1
+  expect((await stopped(host)).map(({ name }) => name)).toEqual(['old', 'hub'])
 })
 
 it('names the Tailscale port of each project the registry knows, for pages opened over the tailnet', async () => {

@@ -18,10 +18,33 @@ export type RunningProject = {
   questions?: number
   /** Its HTTPS port on the tailnet, when Tailscale registered one: where a page opened over the tailnet reaches it. */
   tailnetPort?: number
+  /** It is the hub: its folder is `fleet.primary` in user settings. */
+  hub?: true
+}
+
+/** A project that ran on this machine before and runs no instance now, from its state home. */
+export type StoppedProject = {
+  name: string
+  /** Its state home, `~/.ultimate/projects/<name>-<hash>`: what `forget` and `start` take. */
+  home: string
+  root?: string
+  repo?: RunningProject['repo']
+  /** The newest of its last opening and its conversations' inputs and answers. */
+  lastActive?: number
+  hub?: true
 }
 
 /** No arguments → every running instance on this machine, this one included, in project order. */
 export const ListAction = actionRef<null, RunningProject[]>('projects', 'list')
+
+/** No arguments → every stopped project not forgotten since it last opened, most recently active first. */
+export const StoppedAction = actionRef<null, StoppedProject[]>('projects', 'stopped')
+
+/** `{ home }` → hides a stopped project from the rail until it opens again; its state home stays as it is. */
+export const ForgetAction = actionRef<{ home: string }, Record<string, never>>('projects', 'forget')
+
+/** `{ home }` → starts a stopped project with `mega start <root>`, returning what it printed. */
+export const StartAction = actionRef<{ home: string }, { output: string }>('projects', 'start')
 
 /** `{ pinned? }` → whether the rail stays open, shared by every instance on this machine; `pinned` sets it first. */
 export const PinAction = actionRef<{ pinned?: boolean }, { pinned: boolean }>('projects', 'pin')

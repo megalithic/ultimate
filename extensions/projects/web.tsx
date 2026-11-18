@@ -1,12 +1,15 @@
 import { debounce, deadline, every } from '../../lib/timers.ts'
 import type { Cancel } from '../../lib/timers.ts'
-import { PinIcon, PinOffIcon } from 'lucide-react'
+import { PinIcon, PinOffIcon, PlayIcon, XIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import type { ReactNode } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   api,
   cn,
   defineWebExtension,
+  errorMessage,
+  formatAgo,
   prettyName,
   keepLast,
   useAction,
@@ -15,8 +18,8 @@ import {
 } from '@/sdk'
 import { ProjectSwatch, RepoLabel, stemOf } from '../sidebar/ui.tsx'
 import { shownPort, target } from './links.ts'
-import { ListAction, PinAction } from './refs.ts'
-import type { RunningProject } from './refs.ts'
+import { ForgetAction, ListAction, PinAction, StartAction, StoppedAction } from './refs.ts'
+import type { RunningProject, StoppedProject } from './refs.ts'
 
 const RAIL = 56
 const WIDE = 272
@@ -95,6 +98,14 @@ function Detail({ project, pending }: { project: RunningProject; pending: boolea
   )
 }
 
+function HubTag() {
+  return (
+    <span className="shrink-0 rounded-sm px-1 font-mono text-[9px] leading-3.5 tracking-wider text-brand uppercase ring-1 ring-brand/40 ring-inset">
+      hub
+    </span>
+  )
+}
+
 function State({ busy, questions }: { busy: boolean; questions: number }) {
   if (questions > 0)
     return (
@@ -128,6 +139,7 @@ function Row({
   const unreachable = !here && !href
   const title = [
     name,
+    project.hub && 'hub',
     project.repo?.name,
     shownPort(project, location),
     unreachable && 'not on the tailnet',
@@ -204,13 +216,16 @@ function Row({
       {wide && (
         <span className="flex min-w-0 flex-1 items-center gap-2 pr-2.5 pl-1.5">
           <span className="flex min-w-0 flex-1 flex-col">
-            <span
-              className={cn(
-                'truncate text-[13px] leading-5',
-                here ? 'font-semibold text-foreground' : 'text-foreground/85',
-              )}
-            >
-              {name}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span
+                className={cn(
+                  'truncate text-[13px] leading-5',
+                  here ? 'font-semibold text-foreground' : 'text-foreground/85',
+                )}
+              >
+                {name}
+              </span>
+              {project.hub && <HubTag />}
             </span>
             <span className="flex min-w-0 items-center gap-1.5 font-mono text-[10px] leading-4 text-muted-foreground/80">
               <Detail pending={pending} project={project} />
@@ -220,6 +235,146 @@ function Row({
         </span>
       )}
     </a>
+  )
+}
+
+function RowButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      aria-label={label}
+      className="flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 outline-none hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+      onClick={onClick}
+      title={label}
+      type="button"
+    >
+      {children}
+    </button>
+  )
+}
+
+function StoppedRow({
+  project,
+  wide,
+  family,
+  refresh,
+}: {
+  project: StoppedProject
+  wide: boolean
+  family: readonly string[]
+  refresh: () => Promise<unknown>
+}) {
+  const [doing, setDoing] = useState<'starting' | 'forgetting'>()
+  const [error, setError] = useState<string>()
+  const name = prettyName(project.name)
+  const ago = project.lastActive && formatAgo(project.lastActive, Date.now(), { ago: true })
+  const title = [
+    name,
+    project.hub && 'hub',
+    project.repo?.name,
+    'stopped',
+    ago && `last active ${ago}`,
+    error,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const run = (what: 'starting' | 'forgetting') => {
+    setDoing(what)
+    setError(undefined)
+    const action =
+      what === 'starting'
+        ? api.action(StartAction, { home: project.home })
+        : api.action(ForgetAction, { home: project.home })
+    action
+      .then(refresh)
+      .catch((failed: unknown) => setError(errorMessage(failed)))
+      .finally(() => setDoing(undefined))
+  }
+  return (
+    <div
+      aria-label={title}
+      className={cn(
+        'group relative mx-1.5 flex h-10 items-center rounded-lg',
+        wide && 'hover:bg-sidebar-accent/40',
+      )}
+      data-project={project.name}
+      title={title}
+    >
+      <span className="flex h-full w-11 shrink-0 justify-center py-px">
+        <span className={pixelAlignedAxis}>
+          <ProjectSwatch
+            className={cn(
+              'h-full w-3 rounded-md opacity-25 group-hover:opacity-45',
+              doing === 'starting' && 'animate-pulse-dot opacity-70',
+            )}
+            family={family}
+            folder={project.name}
+          />
+        </span>
+      </span>
+      {wide && (
+        <span className="flex min-w-0 flex-1 items-center gap-1 pr-1.5 pl-1.5">
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-[13px] leading-5 text-muted-foreground">{name}</span>
+              {project.hub && <HubTag />}
+            </span>
+            <span className="flex min-w-0 items-center gap-1.5 font-mono text-[10px] leading-4 text-muted-foreground/60">
+              {doing ? (
+                <span className="text-brand">{doing}…</span>
+              ) : error ? (
+                <span className="truncate text-destructive">{error}</span>
+              ) : (
+                <>
+                  {project.repo && <RepoLabel className="min-w-0 opacity-70" repo={project.repo} />}
+                  {ago && <span className="shrink-0">{ago}</span>}
+                </>
+              )}
+            </span>
+          </span>
+          {!doing && (
+            <span className="flex shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+              {project.root && (
+                <RowButton label={`Start ${name}`} onClick={() => run('starting')}>
+                  <PlayIcon className="size-3.5" />
+                </RowButton>
+              )}
+              <RowButton
+                label={`Forget ${name} until it runs again (keeps its conversations)`}
+                onClick={() => run('forgetting')}
+              >
+                <XIcon className="size-3.5" />
+              </RowButton>
+            </span>
+          )}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function StoppedHeading({ wide, count }: { wide: boolean; count: number }) {
+  return (
+    <div className="mx-1.5 mt-3 mb-1 flex h-5 items-center">
+      <span className="flex w-11 shrink-0 justify-center">
+        <span className="h-px w-4 bg-border" />
+      </span>
+      {wide && (
+        <>
+          <span className="section-label pl-1.5">Stopped</span>
+          <span className="ml-1.5 font-mono text-[11px] text-muted-foreground/60 tabular-nums">
+            {count}
+          </span>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -253,17 +408,25 @@ function Rail() {
     enabled: !railOccupied,
   })
   useVisiblePoll(list.refetch, VISIBLE_PROJECTS_POLL_MS, railOccupied)
+  const stoppedList = useAction(StoppedAction, null, {
+    onError: keepLast,
+    enabled: !railOccupied,
+  })
+  useVisiblePoll(stoppedList.refetch, VISIBLE_PROJECTS_POLL_MS, railOccupied)
   const [hover, setHover] = useState(false)
   const [pinned, setPinned] = useSharedPin(railOccupied)
   const [showHover] = useState(() => debounce(150, () => setHover(true)))
   useEffect(() => showHover.cancel, [showHover])
   const projects = list.data ?? []
+  const stopped = stoppedList.data ?? []
   const loading = !list.data && !list.error
   const loadedAfterMount = useRef(loading).current
-  if (railOccupied || viewport === 'phone' || (!loading && projects.length < 2)) return null
+  const rows = projects.length + stopped.length
+  if (railOccupied || viewport === 'phone' || (!loading && rows < 2)) return null
 
   const wide = hover || pinned
-  const family = projects.map((project) => project.name)
+  const family = [...projects, ...stopped].map((project) => project.name)
+  const refresh = () => Promise.all([list.refetch(), stoppedList.refetch()])
   const questions = projects.reduce((sum, project) => sum + (project.questions ?? 0), 0)
   const working = projects.filter((project) => (project.busy ?? 0) > 0).length
 
@@ -325,6 +488,16 @@ function Rail() {
                 </div>
               )
             })}
+            {stopped.length > 0 && <StoppedHeading count={stopped.length} wide={wide} />}
+            {stopped.map((project) => (
+              <StoppedRow
+                family={family}
+                key={project.home}
+                project={project}
+                refresh={refresh}
+                wide={wide}
+              />
+            ))}
           </div>
         </div>
         <div className={statusLineAlignedFooter}>
