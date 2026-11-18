@@ -532,7 +532,9 @@ function Tree({
   const flightParents = openBranches
     .map((branch) => branch.id)
     .filter((id) => childrenByParent.has(id))
-  const anyFlightOpen = flightParents.some((id) => !folded.includes(id))
+  const anyFlightOpen =
+    flightParents.some((id) => !folded.includes(id)) ||
+    expanded.some((id) => childrenByParent.has(id))
   const toggleFlights =
     flightParents.length > 0 ? (
       <button
