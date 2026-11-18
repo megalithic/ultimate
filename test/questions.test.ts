@@ -405,6 +405,14 @@ describe('questions on a message', () => {
     await expect(f.answer({ messageId: message!.id, text: '3: Yes' })).rejects.toThrow(
       'Question 3 is already answered',
     )
+    // A notification's Approve was written before anything was answered: it answers only what is still open.
+    await expect(
+      f.answer({
+        messageId: message!.id,
+        answers: [{ question: 'Land it?', answer: 'Yes' }],
+        onlyOpen: true,
+      }),
+    ).rejects.toThrow('These questions are already answered')
     await f.type(id, 'Still deciding')
     expect(
       (await f.entries(id)).findLast((entry) => entry.kind === 'board.open')?.model?.[0]?.content,
@@ -431,11 +439,20 @@ describe('questions on a message', () => {
     const id = await f.ultimate()
     const { message } = await f.ask(id, { text: 'Decide these.', questions: decisions })
     await f.answer({ messageId: message!.id, answers: [{ question: 'Name', answer: 'Cards' }] })
+    const { id: approved } = await f.answer({
+      messageId: message!.id,
+      answers: [
+        { question: 'Land it?', answer: 'Yes' },
+        { question: 'Name', answer: 'Questions' },
+      ],
+      onlyOpen: true,
+    })
+    expect((await f.log()).messages.find((m) => m.id === approved)?.text).toBe('3: Yes')
     await f.dismiss(message!.id)
     await f.settled()
     expect((await f.log()).messages.find((m) => m.id === message!.id)).toMatchObject({
       state: 'dismissed',
-      answered: { 4: 'Cards' },
+      answered: { 2: 'Yes', 4: 'Cards' },
     })
   })
 

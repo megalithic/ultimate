@@ -15,14 +15,22 @@ const NOT_OPEN = 'These questions are no longer open'
 export const userActions = ['answer', 'dismiss']
 export const actions = {
   answer: implementAction(AnswerAction, async (args, { host, signal, device }) => {
-    const data = args as Reply & { messageId: number }
+    const data = args as Reply & { messageId: number; onlyOpen?: boolean }
     if (!data || !Number.isSafeInteger(data.messageId)) throw new Error('Invalid answers')
+    if (data.onlyOpen !== undefined && typeof data.onlyOpen !== 'boolean')
+      throw new Error('Invalid answers')
     checkReply(data)
     const reply = await host.harness().commit(async (tx) => {
       const log = await tx.doc(Messages, ROOT_CONVERSATION_ID)
       const message = log.messages.find((m) => m.id === data.messageId)
       if (!message || !open(message)) throw new Error(NOT_OPEN)
-      return replyText(data, message.questions ?? [])
+      const questions = message.questions ?? []
+      const stillOpen = (answer: { question: string }) =>
+        !(questions.findIndex((q) => q.text === answer.question) in (message.answered ?? {}))
+      const answers = data.onlyOpen ? data.answers?.filter(stillOpen) : data.answers
+      if (data.answers?.length && !answers?.length && !data.note?.trim())
+        throw new Error('These questions are already answered')
+      return replyText({ ...data, ...(answers ? { answers } : {}) }, questions)
     }, context)
     return {
       id: await host

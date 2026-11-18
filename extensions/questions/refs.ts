@@ -12,10 +12,11 @@ export type Reply = { answers?: Answer[]; note?: string; text?: string }
 /**
  * `{ messageId, answers?, note? }` or `{ messageId, text }` → `{ id }`: answer open message `messageId` with a reply
  * to its sender, from its questions (`note` goes after the answer lines) or as free text; `id` is the reply's message
- * id. Fails when the message no longer waits on the user.
+ * id. Fails when the message no longer waits on the user, or names a question already answered; with `onlyOpen`
+ * (a notification's Approve, written when nothing was answered yet), answers to those are dropped instead.
  */
 export const AnswerAction = actionRef<
-  { messageId: number; answers?: Answer[]; note?: string; text?: string },
+  { messageId: number; answers?: Answer[]; note?: string; text?: string; onlyOpen?: boolean },
   { id: number }
 >('questions', 'answer')
 /**

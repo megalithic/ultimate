@@ -10,7 +10,7 @@ import { Messages } from '../../messages/api.ts'
 import { trim } from '../../messages/log.ts'
 import { Standing } from '../../subagents/api.ts'
 import { Summaries, setAutomaticSummaries } from '../../conversations/summary.ts'
-import { liveInstructions } from '../server.ts'
+import { liveInstructions, questionsText } from '../server.ts'
 import type { VoiceAnswer, VoiceLine } from '../refs.ts'
 import { writeSecret } from '../../secrets/store.ts'
 import { fauxServer, held, post, sourceCopy, temp, until } from '../../../test/helpers.ts'
@@ -42,7 +42,7 @@ export const actions = {
   settle: ({ message, text, call }, { host }) =>
     text === undefined
       ? host.need(MessagesApi).dismiss(message, BACKGROUND_CONTEXT, undefined, call)
-      : host.need(MessagesApi).answer(message, text, BACKGROUND_CONTEXT, undefined, call),
+      : host.need(MessagesApi).answer(message, text, BACKGROUND_CONTEXT, undefined, call, true),
 }
 export default { name: 'settle-probe' }
 `,
@@ -557,6 +557,17 @@ const finish = async (f: Fixture) => {
   servers.splice(servers.indexOf(f.server), 1)
   await f.server.close()
 }
+it('reads only the questions still open, in their own numbering, after naming the answered ones', () => {
+  const text = questionsText(
+    [
+      { text: 'Where?', kind: 'choice', options: [{ label: 'Inbox' }, { label: 'Transcript' }] },
+      { text: 'Ship it?', kind: 'confirm' },
+    ],
+    { 0: 'Inbox' },
+  )
+  expect(text).toBe('Already answered: 1.\n\n2. Ship it?')
+})
+
 const voiceAnswer = (f: Fixture) =>
   f.server.host.registry
     .snapshot()

@@ -180,23 +180,29 @@ async function writeDisplayOnlyEntry(
   return settled.entry
 }
 
-function questionsText(questions: Question[]) {
-  return questions
-    .map((q, i) =>
-      [
-        `${q.ref ?? i + 1}. ${q.text}`,
-        ...(q.options ?? []).map(
-          (o, j) =>
-            `${o.key ?? String.fromCharCode(97 + j)}: ${o.label}${o.detail ? ` — ${o.detail}` : ''}${o.recommended ? ' (the asker’s pick)' : ''}`,
-        ),
-        ...(q.scale
-          ? [
-              `Scale ${q.scale.min} (${q.scale.low ?? ''}) to ${q.scale.max} (${q.scale.high ?? ''})`,
-            ]
-          : []),
-      ].join('\n'),
-    )
-    .join('\n\n')
+export function questionsText(questions: Question[], answered: Message['answered'] = {}) {
+  const answeredRefs = questions.flatMap((q, i) => (i in answered ? [q.ref ?? String(i + 1)] : []))
+  return [
+    ...(answeredRefs.length ? [`Already answered: ${answeredRefs.join(', ')}.`] : []),
+    ...questions.flatMap((q, i) =>
+      i in answered
+        ? []
+        : [
+            [
+              `${q.ref ?? i + 1}. ${q.text}`,
+              ...(q.options ?? []).map(
+                (o, j) =>
+                  `${o.key ?? String.fromCharCode(97 + j)}: ${o.label}${o.detail ? ` — ${o.detail}` : ''}${o.recommended ? ' (the asker’s pick)' : ''}`,
+              ),
+              ...(q.scale
+                ? [
+                    `Scale ${q.scale.min} (${q.scale.low ?? ''}) to ${q.scale.max} (${q.scale.high ?? ''})`,
+                  ]
+                : []),
+            ].join('\n'),
+          ],
+    ),
+  ].join('\n\n')
 }
 
 function askerOf(
@@ -213,7 +219,9 @@ function questionText(host: ExtensionHost, message: Message, main: ConversationI
   return [
     `Message ${message.id} from ${askerOf(host, message, main)}, asked ${formatAgo(message.at, Date.now(), { ago: true })}:`,
     message.text,
-    ...(message.questions?.length ? ['', `Questions:\n${questionsText(message.questions)}`] : []),
+    ...(message.questions?.length
+      ? ['', `Questions:\n${questionsText(message.questions, message.answered)}`]
+      : []),
   ].join('\n')
 }
 
@@ -889,7 +897,7 @@ export default (host: ExtensionHost) => {
         name: 'voice_answer',
         deferred: true,
         description:
-          'Settle open question `message` with the user’s answer `text` (numbered parts with their letters, in their words), or close it unanswered with `dismiss`. Only after you read the answer back and the user confirmed it. Returns the questions still open.',
+          'Settle open question `message` with the user’s answer `text` (numbered parts with their letters, in their words, one part per line: parts it does not name stay open), or close it unanswered with `dismiss`. Only after you read the answer back and the user confirmed it. Returns the questions still open.',
         parameters: obj({
           message: int(),
           text: opt(str({ minLength: 1 })),

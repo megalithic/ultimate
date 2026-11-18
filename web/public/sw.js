@@ -43,7 +43,7 @@ self.addEventListener('notificationclick', (event) => {
       answerAndCloseOrReplaceNotification(
         notification,
         data,
-        event.action === 'approve' ? { answers: data.approve } : { text: reply },
+        event.action === 'approve' ? { answers: data.approve, onlyOpen: true } : { text: reply },
       ),
     )
     return
