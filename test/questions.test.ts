@@ -677,6 +677,29 @@ describe('answer text', () => {
         ),
       ).toEqual({ 0: label })
     expect(answersNamedAtLineStart('1b', mixedKeys)).toEqual({ 0: 'Inbox' })
+    // One heading names one question: the longest text it starts with.
+    const overlapping: Question[] = [
+      { text: 'Scope', kind: 'text' },
+      { text: 'Scope: deployment', kind: 'text' },
+    ]
+    expect(
+      answersNamedAtLineStart(
+        answerText([{ question: 'Scope: deployment', answer: 'Production' }], overlapping),
+        overlapping,
+      ),
+    ).toEqual({ 1: 'Production' })
+    expect(
+      answersNamedAtLineStart(
+        answerText(
+          [
+            { question: 'Scope', answer: 'All' },
+            { question: 'Scope: deployment', answer: 'Production' },
+          ],
+          overlapping,
+        ),
+        overlapping,
+      ),
+    ).toEqual({ 0: 'All', 1: 'Production' })
   })
 
   it('drops fields that do not apply to a kind and trims what it keeps', () => {

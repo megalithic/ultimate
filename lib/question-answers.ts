@@ -67,7 +67,18 @@ export function numberOf(questions: readonly Question[], index: number) {
   return questions.some((question) => question.ref === shown) ? undefined : shown
 }
 
-function givenOnLine(question: Question, number: string | undefined, line: string) {
+const headsWithLongestText = (questions: readonly Question[], question: Question, at: string) =>
+  at.startsWith(`${question.text}:`) &&
+  !questions.some(
+    (other) => other.text.length > question.text.length && at.startsWith(`${other.text}:`),
+  )
+
+function givenOnLine(
+  questions: readonly Question[],
+  question: Question,
+  number: string | undefined,
+  line: string,
+) {
   const numbered =
     number === undefined
       ? null
@@ -92,15 +103,16 @@ function givenOnLine(question: Question, number: string | undefined, line: strin
     const titled = `${question.text.split('\n')[0]}:`
     return (words.startsWith(titled) ? words.slice(titled.length).trim() : words) || undefined
   }
-  const prefix = `${question.text}:`
-  return line.startsWith(prefix) ? line.slice(prefix.length).trim() || undefined : undefined
+  return headsWithLongestText(questions, question, line)
+    ? line.slice(question.text.length + 1).trim() || undefined
+    : undefined
 }
 
-function byMultilineText(question: Question, text: string) {
+function byMultilineText(questions: readonly Question[], question: Question, text: string) {
   if (!question.text.includes('\n')) return undefined
   const prefix = `${question.text}:`
   const at = `\n${text}`.indexOf(`\n${prefix}`)
-  if (at < 0) return undefined
+  if (at < 0 || !headsWithLongestText(questions, question, text.slice(at))) return undefined
   return (
     text
       .slice(at + prefix.length)
@@ -116,9 +128,9 @@ export function answersNamedAtLineStart(text: string, questions: readonly Questi
     const number = numberOf(questions, index)
     const found =
       lines.reduce<string | string[] | undefined>(
-        (first, line) => first ?? givenOnLine(question, number, line),
+        (first, line) => first ?? givenOnLine(questions, question, number, line),
         undefined,
-      ) ?? byMultilineText(question, text)
+      ) ?? byMultilineText(questions, question, text)
     if (found !== undefined) given[index] = found
   }
   return given
