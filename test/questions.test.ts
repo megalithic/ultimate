@@ -434,6 +434,24 @@ describe('questions on a message', () => {
     expect((await f.entries(id)).filter((entry) => entry.kind === 'board.open')).toHaveLength(count)
   })
 
+  it("names an open question by its text when its position is another question's number", async () => {
+    const f = await fixture()
+    const id = await f.ultimate()
+    const { message } = await f.ask(id, {
+      text: 'Decide.',
+      questions: [
+        { text: 'Size', kind: 'text', ref: '2' },
+        { text: 'Colour', kind: 'text' },
+      ],
+    })
+    await f.answer({ messageId: message!.id, text: '2: Small' })
+    const log = (await f.log()).messages
+    expect(log.find((m) => m.re === message!.id)?.open).toEqual(['"Colour"'])
+    expect(gist(log.find((m) => m.id === message!.id)!)).toBe('questions Colour')
+    await f.answer({ messageId: message!.id, text: 'Colour: red' })
+    expect((await f.log()).messages.find((m) => m.id === message!.id)?.state).toBe('answered')
+  })
+
   it('dismisses a partly answered message whole', async () => {
     const f = await fixture()
     const id = await f.ultimate()

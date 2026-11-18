@@ -78,8 +78,8 @@ const Answers = ({ message }: { message: Message }) => (
   </>
 )
 
-const settledLabel = (question: Message, answer: Message) =>
-  question.state === 'dismissed'
+const settledLabel = (dismissal: boolean, answer: Message) =>
+  dismissal
     ? answer.via
       ? '@ultimate dismissed it for you'
       : 'You dismissed it'
@@ -262,8 +262,12 @@ export function Bubble({
       >
         {message?.images && <MessageImages conversation={from} entry={message.images.entry} />}
         {children}
-        {answers.map((answer) => (
-          <AttachedAnswer answer={answer} key={answer.id} question={message!} />
+        {answers.map((answer, index) => (
+          <AttachedAnswer
+            answer={answer}
+            dismissal={message?.state === 'dismissed' && index === answers.length - 1}
+            key={answer.id}
+          />
         ))}
         {(showAttentionOrFailureStatus || message?.error) && (
           <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
@@ -301,17 +305,16 @@ function Sender({ id, tone }: { id: ConversationId; tone: string }) {
   )
 }
 
-function AttachedAnswer({ answer, question }: { answer: Message; question: Message }) {
+function AttachedAnswer({ answer, dismissal }: { answer: Message; dismissal: boolean }) {
   const now = useNow(60000)
   const accent = accentOf('user')
-  const dismissed = question.state === 'dismissed'
   const { via } = answer
   const { showSurface, switchConversation } = useUltimate()
   return (
     <div className="border-t border-border/60 px-3 py-2.5" data-compact-answer={answer.id}>
       <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
         <CornerDownRightIcon className={cn('size-3.5 shrink-0', accent.name)} />
-        <span className={cn('font-semibold', accent.name)}>{settledLabel(question, answer)}</span>
+        <span className={cn('font-semibold', accent.name)}>{settledLabel(dismissal, answer)}</span>
         {via?.entry !== undefined && (
           <button
             className="flex cursor-pointer items-center gap-1 hover:text-foreground"
@@ -336,7 +339,7 @@ function AttachedAnswer({ answer, question }: { answer: Message; question: Messa
           {formatAgo(answer.at, now)}
         </time>
       </div>
-      {(!dismissed || via) && (
+      {(!dismissal || via) && (
         <UserText
           className="mt-1.5 rounded-md border border-border/70 bg-secondary/60 px-3 py-2 text-[13px] leading-relaxed"
           text={answer.text}
@@ -705,7 +708,7 @@ function UserTurn({ entry, id, text }: { entry: EntryRecord; id: number; text: s
         type="button"
       >
         <CornerLeftUpIcon className="size-3" />
-        {question.state === 'dismissed'
+        {question.state === 'dismissed' && answersTo(log!.messages, question).at(-1)?.id === id
           ? message?.via
             ? '@ultimate dismissed a question for you'
             : 'you dismissed a question'

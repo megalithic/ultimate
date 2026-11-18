@@ -8,7 +8,7 @@ import { Messages } from './api.ts'
 import { Standing } from '../subagents/api.ts'
 import type { Message } from './api.ts'
 import type { Question } from './refs.ts'
-import { answersNamedAtLineStart } from '../../lib/question-answers.ts'
+import { answersNamedAtLineStart, numberOf } from '../../lib/question-answers.ts'
 
 const optionSchema = obj({
   label: str({
@@ -105,7 +105,8 @@ export function checkQuestions(questions: Question[]): Question[] {
 
 export { openQuestion }
 
-const position = (question: Question, index: number) => question.ref ?? String(index + 1)
+const named = (questions: readonly Question[], index: number) =>
+  numberOf(questions, index) ?? `"${questions[index].text.split('\n')[0]}"`
 
 export function answerNamedQuestionsReturningOpen(
   message: Message,
@@ -116,7 +117,7 @@ export function answerNamedQuestionsReturningOpen(
   const given = answersNamedAtLineStart(text, questions)
   for (const index of Object.keys(given).map(Number))
     if (message.answered && index in message.answered)
-      throw new Error(`Question ${position(questions[index], index)} is already answered`)
+      throw new Error(`Question ${named(questions, index)} is already answered`)
   const namesAny = Object.keys(given).length > 0
   if (!questions.length || (settlesWholeWhenNamingNone && !namesAny)) {
     message.state = 'answered'
@@ -124,20 +125,19 @@ export function answerNamedQuestionsReturningOpen(
   }
   if (namesAny) message.answered = { ...message.answered, ...given }
   const answered = message.answered ?? {}
-  const open = questions.flatMap((question, index) =>
-    index in answered ? [] : [position(question, index)],
-  )
+  const open = questions.flatMap((_, index) => (index in answered ? [] : [named(questions, index)]))
   if (!open.length) message.state = 'answered'
   return open
 }
 
 export const gist = (message: Pick<Message, 'text' | 'questions' | 'answered'>) => {
-  const open = message.questions?.flatMap((question, index) =>
-    message.answered && index in message.answered
-      ? []
-      : [`${position(question, index)}. ${question.text}`],
-  )
-  const lines = open?.length
+  const questions = message.questions ?? []
+  const open = questions.flatMap((question, index) => {
+    if (message.answered && index in message.answered) return []
+    const number = numberOf(questions, index)
+    return [number === undefined ? question.text : `${number}. ${question.text}`]
+  })
+  const lines = open.length
     ? [`questions ${open.join('; ')}`]
     : message.text
         .split('\n')
