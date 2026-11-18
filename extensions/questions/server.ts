@@ -22,13 +22,7 @@ export const actions = {
       const log = await tx.doc(Messages, ROOT_CONVERSATION_ID)
       const message = log.messages.find((m) => m.id === data.messageId)
       if (!message || !open(message)) throw new Error(NOT_OPEN)
-      const questions = message.questions ?? []
-      for (const { question } of data.answers ?? []) {
-        const index = questions.findIndex((q) => q.text === question)
-        if (message.answered && index in message.answered)
-          throw new Error(`Question ${questions[index].ref ?? index + 1} is already answered`)
-      }
-      return replyText(data, questions)
+      return replyText(data, message.questions ?? [])
     }, context)
     return {
       id: await host

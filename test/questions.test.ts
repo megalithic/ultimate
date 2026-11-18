@@ -402,6 +402,9 @@ describe('questions on a message', () => {
     await expect(
       f.answer({ messageId: message!.id, answers: [{ question: 'Land it?', answer: 'Yes' }] }),
     ).rejects.toThrow('Question 3 is already answered')
+    await expect(f.answer({ messageId: message!.id, text: '3: Yes' })).rejects.toThrow(
+      'Question 3 is already answered',
+    )
     await f.type(id, 'Still deciding')
     expect(
       (await f.entries(id)).findLast((entry) => entry.kind === 'board.open')?.model?.[0]?.content,
@@ -534,6 +537,11 @@ describe('settling for the user', () => {
           JSON.stringify(entry.model).includes('questions 1, 2 are still open on the card'),
       ),
     ).toBe(true)
+    // A repeated answer names a question, so it never settles the whole message.
+    await expect(f.settle(id, { messageId: message!.id, text: '3: Yes' })).rejects.toThrow(
+      'Question 3 is already answered',
+    )
+    expect((await f.log()).messages.find((m) => m.id === message!.id)?.state).toBe('delivered')
     await f.settle(id, { messageId: message!.id, text: 'Go with what you recommended.' })
     expect((await f.log()).messages.find((m) => m.id === message!.id)?.state).toBe('answered')
   })
@@ -596,10 +604,16 @@ describe('answer text', () => {
       answersNamedAtLineStart(
         '1: neither\n2a,c. Suites: unit, lint\n3 more things: later\n4\n5. Cards',
         decisions,
-        { 4: 'Questions' },
       ),
-    ).toEqual({ 0: 'neither', 1: ['unit', 'lint'] })
+    ).toEqual({ 0: 'neither', 1: ['unit', 'lint'], 4: 'Cards' })
     expect(answersNamedAtLineStart('Before I answer: why 5?', decisions)).toEqual({})
+    // A number names one question: an explicit ref wins over an unnumbered question's position.
+    const mixed: Question[] = [
+      { text: 'Size', kind: 'text', ref: '2' },
+      { text: 'Colour', kind: 'text' },
+    ]
+    expect(answersNamedAtLineStart('2: Small', mixed)).toEqual({ 0: 'Small' })
+    expect(answersNamedAtLineStart('Colour: red\n1: big', mixed)).toEqual({ 1: 'red' })
   })
 
   it('drops fields that do not apply to a kind and trims what it keeps', () => {

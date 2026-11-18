@@ -53,12 +53,18 @@ export function answerText(answers: Answer[], questions: readonly Question[], no
 
 export type AnswersByQuestionIndex = Record<number, string | string[]>
 
-const position = (question: Question, index: number) => question.ref ?? String(index + 1)
+function numberOf(questions: readonly Question[], index: number) {
+  const own = questions[index].ref
+  if (own !== undefined) return own
+  const shown = String(index + 1)
+  return questions.some((question) => question.ref === shown) ? undefined : shown
+}
 
-function givenOnLine(question: Question, index: number, line: string) {
-  const numbered = new RegExp(
-    `^${position(question, index)}([a-z](?:,[a-z])*)?(?:[.:]\\s*(.*))?$`,
-  ).exec(line)
+function givenOnLine(question: Question, number: string | undefined, line: string) {
+  const numbered =
+    number === undefined
+      ? null
+      : new RegExp(`^${number}([a-z](?:,[a-z])*)?(?:[.:]\\s*(.*))?$`).exec(line)
   if (numbered) {
     const keys = numbered[1]?.split(',') ?? []
     const labels = keys.flatMap(
@@ -87,18 +93,14 @@ function byMultilineText(question: Question, text: string) {
   )
 }
 
-export function answersNamedAtLineStart(
-  text: string,
-  questions: readonly Question[],
-  alreadyAnswered: AnswersByQuestionIndex = {},
-) {
+export function answersNamedAtLineStart(text: string, questions: readonly Question[]) {
   const given: AnswersByQuestionIndex = {}
   const lines = text.split('\n').map((line) => line.trim())
   for (const [index, question] of questions.entries()) {
-    if (index in alreadyAnswered) continue
+    const number = numberOf(questions, index)
     const found =
       lines.reduce<string | string[] | undefined>(
-        (first, line) => first ?? givenOnLine(question, index, line),
+        (first, line) => first ?? givenOnLine(question, number, line),
         undefined,
       ) ?? byMultilineText(question, text)
     if (found !== undefined) given[index] = found

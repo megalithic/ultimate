@@ -29,8 +29,8 @@ or keys, an option that is "Something else"/"Other" (the card adds it), a scale 
 `questions` goes only with a reply-expected message to `user`.
 
 Each question stays open until a reply to its message answers it: the card's answer, or a typed reply or note that
-names it at a line start, by number (`2: …`, `1b`, `2a,c. …`) or, when the message numbered nothing, by its text
-(`Scope: …`). A reply that names none (a note on its own, "before I answer, …") reaches the asker and leaves every
+names it at a line start, by number (`2: …`, `1b`, `2a,c. …`; an unnumbered question goes by its position unless
+another question has that number as its ref) or by its text (`Scope: …`). A reply that names none (a note on its own, "before I answer, …") reaches the asker and leaves every
 question open. The message closes once all its questions are answered, when the user dismisses it, or when @ultimate
 settles it for them from what they said in its chat (messages' `settle`; the card then reads "@ultimate answered for
 you"), which answers only the questions its text names, or all of them when it names none. The message stores what
@@ -79,7 +79,8 @@ Both are user-only.
 - `answer { messageId, answers: [{ question, answer }], note? }`, a multi answer as its list of labels, validates against the message's questions, refusing
   unknown or duplicate answers, and posts a normal user reply to the sender with `re: messageId`, one paragraph per
   answer in the message's own numbering: `1a. Topic: option` for an option, `2a,c. Topic: a, c` for several, `3: text` for typed text or a rating (`Topic: answer` when the message numbered
-  nothing), then `Note: …`; with no answers the note alone is the reply. Answering a question already answered is refused. Returns `{ id }`. `answer { messageId, text }`
+  nothing), then `Note: …`; with no answers the note alone is the reply. A reply (any form, `settle` too) that names a question already answered
+  is refused, in the commit that records it. Returns `{ id }`. `answer { messageId, text }`
   posts `text` instead, for a message with or without questions. Messages admission atomically verifies that the
   original remains open, so concurrent answers produce exactly one reply; normal Messages delivery wakes the sender.
 - `dismiss { messageId }` marks the message `dismissed` and posts a one-way user note to the sender with `re`, in one

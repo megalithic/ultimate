@@ -113,7 +113,10 @@ export function answerNamedQuestionsReturningOpen(
   settlesWholeWhenNamingNone: boolean,
 ) {
   const questions = message.questions ?? []
-  const given = answersNamedAtLineStart(text, questions, message.answered)
+  const given = answersNamedAtLineStart(text, questions)
+  for (const index of Object.keys(given).map(Number))
+    if (message.answered && index in message.answered)
+      throw new Error(`Question ${position(questions[index], index)} is already answered`)
   const namesAny = Object.keys(given).length > 0
   if (!questions.length || (settlesWholeWhenNamingNone && !namesAny)) {
     message.state = 'answered'
