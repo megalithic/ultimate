@@ -197,14 +197,8 @@ export const Started = defineDoc<{
   initial: () => ({}),
 })
 
-export async function markStarted(
-  host: ExtensionHost,
-  tx: Tx,
-  branch: ConversationId,
-  by: ConversationId,
-) {
+export async function markStarted(tx: Tx, branch: ConversationId, by: ConversationId) {
   ;(await tx.doc(Started, branch)).by = by
-  await serve(host, tx, by, { kind: 'branch', id: branch })
 }
 
 export async function starterOf(host: ExtensionHost, id: ConversationId | 'user', ctx: Context) {

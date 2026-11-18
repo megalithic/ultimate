@@ -145,8 +145,8 @@ are a conversation id, `'user'` or `'remote'`; `state` is `sent`, `delivered`, `
 There is no user posting action: users type in a conversation or answer a card. `host.want(MessagesApi)` (`api.ts`)
 exposes `send`, a one-way message from a conversation, and `answer`, the user's reply to an open message.
 `started(tx, branch, by)` records `by` as a branch's starter, as the `branch` tool does, for a branch forked with
-`LineageApi.branch({ deliver: false })`: its reports and answers then reach `by`, and it serves the agents' requests
-`by`'s current run owes (`board.serving`), as a branch `by` messages does.
+`LineageApi.branch({ deliver: false })`: its reports and answers then reach `by`. It takes over none of `by`'s owed
+requests (`board.serving`); only messaging the branch hands those over.
 
 ## Files
 

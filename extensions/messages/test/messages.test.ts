@@ -1574,6 +1574,24 @@ it("routes a branch's later final answer to its starter once, waking it when the
   await b.settled()
   expect(await b.from()).toHaveLength(2)
 })
+it('hands a branch marked started none of the requests its starter owes', async () => {
+  const f = await fixture()
+  await sendMessage(f.host, f.recipient.id, { to: '#1', text: 'Work\nHOLD', steer: true }, context)
+  await until(f.holding)
+  const branch = await f.opened.harness.createConversation(
+    { ownership: { kind: 'ownerless' } },
+    context,
+  )
+  await f.opened.harness.commit(
+    (tx) => f.service().started(tx, branch.id, ROOT_CONVERSATION_ID),
+    context,
+  )
+  expect(await starterOf(f.host, branch.id, context)).toBe(ROOT_CONVERSATION_ID)
+  expect(
+    (await f.opened.harness.snapshot(Serving, ROOT_CONVERSATION_ID, context))?.owners ?? {},
+  ).toEqual({})
+  f.hold.release()
+})
 it('routes the final answer of a branch another extension forked and marked started to its starter', async () => {
   const f = await fixture()
   await f.opened.harness.commit(async (tx) => {

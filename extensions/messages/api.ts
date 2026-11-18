@@ -128,8 +128,8 @@ export type MessagesService = {
   dropped(tx: Tx, automation: string, source: string, why: string): Promise<void>
   /**
    * Inside `tx`, record conversation `by` as the starter of branch `branch` (`board.started`), as the `branch` tool does:
-   * its reports and answers then reach `by`, and `by`'s answers to them route back down. The branch serves the agents'
-   * requests `by`'s current run still owes, as a branch `by` messages does.
+   * its reports and answers then reach `by`, and `by`'s answers to them route back down. It serves none of `by`'s owed
+   * requests (`board.serving`): only messaging the branch hands those over.
    */
   started(tx: Tx, branch: ConversationId, by: ConversationId): Promise<void>
 }

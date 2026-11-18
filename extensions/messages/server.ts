@@ -262,7 +262,7 @@ export default function messages(host: ExtensionHost) {
     submitFire: (tx, to, input, { id, name }) =>
       submitOutput(host, tx, to, input, { kind: 'automation', id }, `automation ${id} "${name}"`),
     dropped: (tx, id, source, why) => dropped(host, tx, { kind: 'automation', id }, source, why),
-    started: (tx, branch, by) => markStarted(host, tx, branch, by),
+    started: markStarted,
   })
   return defineExtension({
     name: 'messages',
