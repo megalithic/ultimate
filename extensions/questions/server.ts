@@ -4,7 +4,7 @@ import type { ExtensionHost } from '../../server/extensions.ts'
 import { Messages, MessagesApi } from '../messages/api.ts'
 import { implementAction } from '../../lib/actions.ts'
 import { openQuestion as open } from '../../lib/message-state.ts'
-import { checkReply, replyText } from '../../lib/question-answers.ts'
+import { checkReply, replyText, structuredAnswers } from '../../lib/question-answers.ts'
 import { AnswerAction, DismissAction } from './refs.ts'
 import type { Reply } from '../../lib/question-answers.ts'
 
@@ -30,12 +30,21 @@ export const actions = {
       const answers = data.onlyOpen ? data.answers?.filter(stillOpen) : data.answers
       if (data.answers?.length && !answers?.length && !data.note?.trim())
         throw new Error('These questions are already answered')
-      return replyText({ ...data, ...(answers ? { answers } : {}) }, questions)
+      const sent = { ...data, ...(answers ? { answers } : {}) }
+      const given = structuredAnswers(sent, questions)
+      return { text: replyText(sent, questions), scope: given ? { given } : {} }
     }, context)
     return {
       id: await host
         .need(MessagesApi)
-        .answer(data.messageId, reply, withAbortSignal(signal, context), device),
+        .answer(
+          data.messageId,
+          reply.text,
+          withAbortSignal(signal, context),
+          device,
+          undefined,
+          reply.scope,
+        ),
     }
   }),
   dismiss: implementAction(DismissAction, async (args, { host, signal, device }) => {

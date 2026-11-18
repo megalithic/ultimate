@@ -4,7 +4,7 @@ import { defineDoc, ROOT_CONVERSATION_ID } from '@earendil-works/pi-durable'
 import type { ExtensionHost } from '../../server/extensions.ts'
 import { Standing } from '../subagents/api.ts'
 import { Messages, MessageSent } from './api.ts'
-import type { Message, Question } from './api.ts'
+import type { AnswerScope, Message, Question } from './api.ts'
 import type { Via } from './refs.ts'
 import {
   answerNamedQuestionsReturningOpen,
@@ -83,7 +83,7 @@ export async function send(
     routed?: EntryId
     echo?: boolean
     serveBranch?: true
-    whole?: boolean
+    scope?: AnswerScope
   } = {},
 ) {
   const { taskId, callId, requestId, answerId, device, via } = options
@@ -156,7 +156,7 @@ export async function send(
       for (const m of (await tx.doc(Messages, ROOT_CONVERSATION_ID)).messages)
         if (openQuestion(m) && m.id === input.re) {
           if (input.dismiss) m.state = 'dismissed'
-          else open = answerNamedQuestionsReturningOpen(m, input.text, !!options.whole)
+          else open = answerNamedQuestionsReturningOpen(m, input.text, options.scope ?? {})
         }
     const stillOpen = open.length
       ? ` (questions ${open.join(', ')} are still open on the card)`

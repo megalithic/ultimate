@@ -68,13 +68,16 @@ export const Messages = defineDoc<{ messages: Message[]; next: number }>({
   initial: () => ({ messages: [], next: 1 }),
 })
 
+export type AnswerScope = { whole?: boolean; given?: Record<number, string | string[]> }
+
 export type MessagesService = {
   /**
    * Reply `text` from the user to open message `messageId`, from browser `device`; returns the reply's message
    * id. Records a `user.input` event. With `call` (a tool call), a receipt commits with the reply, and a replay of
    * that call returns the same id even though the question is closed by then. A text answers the message's questions
-   * it names by number, and leaves the others open; with `whole` (an agent relaying the user's explicit answer to
-   * this message), a text that names none answers them all.
+   * it names at a line start, and leaves the others open. `scope.given` (a card's answers, by question index) names
+   * them instead of the text; with `scope.whole` (an agent relaying the user's explicit answer to this message), a
+   * text that names none answers them all.
    */
   answer(
     messageId: number,
@@ -82,7 +85,7 @@ export type MessagesService = {
     ctx: Context,
     device?: Device,
     call?: { taskId: TaskId; callId: string },
-    whole?: boolean,
+    scope?: AnswerScope,
   ): Promise<number>
   /**
    * The messages that wait on the user's answer, oldest first: each one's id, the conversation that asked, when, and its

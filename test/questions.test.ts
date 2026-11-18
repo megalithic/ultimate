@@ -452,6 +452,29 @@ describe('questions on a message', () => {
     expect((await f.log()).messages.find((m) => m.id === message!.id)?.state).toBe('answered')
   })
 
+  it("answers exactly the card's questions, whatever their answers or the note say", async () => {
+    const f = await fixture()
+    const id = await f.ultimate()
+    const { message } = await f.ask(id, {
+      text: 'Decide.',
+      questions: [
+        { text: 'Scope', kind: 'text' },
+        { text: 'Scope: deployment', kind: 'text' },
+      ],
+    })
+    await f.answer({
+      messageId: message!.id,
+      answers: [{ question: 'Scope', answer: 'deployment: Production' }],
+      note: '2: not yet',
+    })
+    const log = (await f.log()).messages
+    expect(log.find((m) => m.id === message!.id)).toMatchObject({
+      state: 'delivered',
+      answered: { 0: 'deployment: Production' },
+    })
+    expect(log.find((m) => m.re === message!.id)?.open).toEqual(['2'])
+  })
+
   it('dismisses a partly answered message whole', async () => {
     const f = await fixture()
     const id = await f.ultimate()
@@ -700,6 +723,14 @@ describe('answer text', () => {
         overlapping,
       ),
     ).toEqual({ 0: 'All', 1: 'Production' })
+    // A multiline heading is one span: its lines name no other question.
+    const spanning: Question[] = [
+      { text: 'Scope', kind: 'text' },
+      { text: 'Scope: deployment\nTarget', kind: 'text' },
+    ]
+    expect(answersNamedAtLineStart('Scope: deployment\nTarget: prod', spanning)).toEqual({
+      1: 'prod',
+    })
   })
 
   it('drops fields that do not apply to a kind and trims what it keeps', () => {

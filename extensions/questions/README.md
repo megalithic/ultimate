@@ -28,9 +28,11 @@ or keys, an option that is "Something else"/"Other" (the card adds it), a scale 
 10 steps, and repeated question texts or refs. Fields that do not apply to a kind are dropped, text is trimmed.
 `questions` goes only with a reply-expected message to `user`.
 
-Each question stays open until a reply to its message answers it: the card's answer, or a typed reply or note that
-names it at a line start, by number (`2: …`, `1b`, `2a,c. …`; an unnumbered question goes by its position unless
-another question has that number as its ref) or by its text (`Scope: …`). A reply that names none (a note on its own, "before I answer, …") reaches the asker and leaves every
+Each question stays open until a reply to its message answers it: the card's answers (exactly the questions picked or
+typed on it; its note answers none), or a free-text reply (`answer { text }`, a notification's reply, voice,
+`settle`) that names it at a line start, by number (`2: …`, `1b`, `2a,c. …`; an unnumbered question goes by its
+position unless another question has that number as its ref) or by its text (`Scope: …`, the longest text a line
+starts with). A reply that names none (a note on its own, "before I answer, …") reaches the asker and leaves every
 question open. The message closes once all its questions are answered, when the user dismisses it, or when @ultimate
 settles it for them from what they said in its chat (messages' `settle`; the card then reads "@ultimate answered for
 you"), which answers only the questions its text names, or all of them when it names none. The message stores what

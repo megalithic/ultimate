@@ -42,7 +42,7 @@ export const actions = {
   settle: ({ message, text, call }, { host }) =>
     text === undefined
       ? host.need(MessagesApi).dismiss(message, BACKGROUND_CONTEXT, undefined, call)
-      : host.need(MessagesApi).answer(message, text, BACKGROUND_CONTEXT, undefined, call, true),
+      : host.need(MessagesApi).answer(message, text, BACKGROUND_CONTEXT, undefined, call, { whole: true }),
 }
 export default { name: 'settle-probe' }
 `,

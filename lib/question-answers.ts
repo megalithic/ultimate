@@ -110,30 +110,48 @@ function givenOnLine(
 
 function byMultilineText(questions: readonly Question[], question: Question, text: string) {
   if (!question.text.includes('\n')) return undefined
-  const prefix = `${question.text}:`
-  const at = `\n${text}`.indexOf(`\n${prefix}`)
+  const at = `\n${text}`.indexOf(`\n${question.text}:`)
   if (at < 0 || !headsWithLongestText(questions, question, text.slice(at))) return undefined
-  return (
-    text
-      .slice(at + prefix.length)
-      .split('\n')[0]
-      .trim() || undefined
-  )
+  const start = at + question.text.length + 1
+  const lineEnd = text.indexOf('\n', start)
+  const end = lineEnd < 0 ? text.length : lineEnd
+  const answer = text.slice(start, end).trim()
+  return answer ? { answer, without: text.slice(0, at) + text.slice(end) } : undefined
 }
 
 export function answersNamedAtLineStart(text: string, questions: readonly Question[]) {
   const given: AnswersByQuestionIndex = {}
-  const lines = text.split('\n').map((line) => line.trim())
+  let rest = text
   for (const [index, question] of questions.entries()) {
+    const found = byMultilineText(questions, question, rest)
+    if (!found) continue
+    given[index] = found.answer
+    rest = found.without
+  }
+  const lines = rest.split('\n').map((line) => line.trim())
+  for (const [index, question] of questions.entries()) {
+    if (index in given) continue
     const number = numberOf(questions, index)
-    const found =
-      lines.reduce<string | string[] | undefined>(
-        (first, line) => first ?? givenOnLine(questions, question, number, line),
-        undefined,
-      ) ?? byMultilineText(questions, question, text)
+    const found = lines.reduce<string | string[] | undefined>(
+      (first, line) => first ?? givenOnLine(questions, question, number, line),
+      undefined,
+    )
     if (found !== undefined) given[index] = found
   }
   return given
+}
+
+export function structuredAnswers(
+  reply: Reply,
+  questions: readonly Question[],
+): AnswersByQuestionIndex | undefined {
+  if (reply.text !== undefined) return undefined
+  return Object.fromEntries(
+    (reply.answers ?? []).map(({ question, answer }) => [
+      questions.findIndex((candidate) => candidate.text === question),
+      answer,
+    ]),
+  )
 }
 
 export function checkReply(input: { answers?: unknown; note?: unknown; text?: unknown }) {

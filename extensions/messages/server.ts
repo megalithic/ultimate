@@ -23,6 +23,7 @@ import { Branches, WorkspacesApi } from '../workspaces/api.ts'
 import { Standing, SubagentsApi } from '../subagents/api.ts'
 import { LineageApi } from '../lineage/api.ts'
 import { Messages, MessagesApi } from './api.ts'
+import type { AnswerScope } from './api.ts'
 import { gist, openQuestion, openQuestionsNote, questionsParameter } from './questions.ts'
 import { callerOf } from './caller.ts'
 import { CallerAction, SettleAction } from './refs.ts'
@@ -63,7 +64,7 @@ async function answer(
     device?: Device
     via?: { via: Via; primary: number }
     call?: { taskId: TaskId; callId: string }
-    whole?: boolean
+    scope?: AnswerScope
   } = {},
 ) {
   if (options.call) {
@@ -90,7 +91,7 @@ async function answer(
       ...(settledOwnQuestionWithoutWake ? { note: true } : {}),
       device: options.device,
       ...(options.via ? { via: options.via.via } : {}),
-      ...(options.whole || options.via ? { whole: true } : {}),
+      scope: options.via ? { ...options.scope, whole: true } : (options.scope ?? {}),
     },
   )
 }
@@ -247,8 +248,8 @@ export default function messages(host: ExtensionHost) {
     },
   })
   host.implement(MessagesApi, {
-    answer: (messageId, text, ctx, device, call, whole) =>
-      answer(host, messageId, text, ctx, { device, call, whole }),
+    answer: (messageId, text, ctx, device, call, scope) =>
+      answer(host, messageId, text, ctx, { device, call, scope }),
     openQuestions: async (ctx) =>
       (
         (await host.harness().snapshot(Messages, ROOT_CONVERSATION_ID, ctx))?.messages ?? []

@@ -19,7 +19,8 @@ import type { ExtensionHost } from '../../server/extensions.ts'
 import type { Device } from '../../shared/events.ts'
 import { implementAction } from '../../lib/actions.ts'
 import { openQuestion } from '../../lib/message-state.ts'
-import { checkReply, replyText } from '../../lib/question-answers.ts'
+import { checkReply, replyText, structuredAnswers } from '../../lib/question-answers.ts'
+import type { AnswersByQuestionIndex } from '../../lib/question-answers.ts'
 import {
   cardKey,
   cardOf,
@@ -202,11 +203,12 @@ async function end(
     if (side.ended || ending.mode) throw new Error(`Side chat #${id} is already ended or ending`)
     if (mode === 'discarded' && side.effects)
       throw new Error(`Side chat #${id} has effects; inject its summary instead`)
-    let reply: { message: number; text: string } | undefined
+    let reply: { message: number; text: string; given?: AnswersByQuestionIndex } | undefined
     if (answer !== undefined) {
       if (!message || !openQuestion(message))
         throw new Error(`Message ${side.question} no longer waits on you; nothing was sent`)
-      reply = { message: message.id, text: replyTextWanted! }
+      const given = structuredAnswers(answer, message.questions ?? [])
+      reply = { message: message.id, text: replyTextWanted!, ...(given ? { given } : {}) }
     }
     ending.mode = mode
     ending.task = await tx.createTask(
@@ -261,7 +263,7 @@ export function endTask(host: ExtensionHost) {
     {
       side: ConversationId
       model?: SummaryModel
-      reply?: { message: number; text: string; device?: Device }
+      reply?: { message: number; text: string; device?: Device; given?: AnswersByQuestionIndex }
     },
     { phase: 'stop' } | { phase: 'summarize' },
     null
@@ -389,10 +391,14 @@ export function endTask(host: ExtensionHost) {
           if (reply && (await stillOpen(reply.message)))
             await host
               .need(MessagesApi)
-              .answer(reply.message, reply.text, ctx, reply.device, {
-                taskId: task.id,
-                callId: 'answer',
-              })
+              .answer(
+                reply.message,
+                reply.text,
+                ctx,
+                reply.device,
+                { taskId: task.id, callId: 'answer' },
+                reply.given ? { given: reply.given } : {},
+              )
               .catch(async (error: unknown) => {
                 const answeredElsewhereBeforeAdmission = !(await stillOpen(reply.message))
                 if (!answeredElsewhereBeforeAdmission) throw error

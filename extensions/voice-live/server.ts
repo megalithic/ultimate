@@ -334,7 +334,9 @@ export function answerTask(host: ExtensionHost) {
             : (matchingReplyBeforeCrash?.id ??
               (await host
                 .need(MessagesApi)
-                .answer(explicitlyNamedQuestion, input.text, ctx, undefined, undefined, true)
+                .answer(explicitlyNamedQuestion, input.text, ctx, undefined, undefined, {
+                  whole: true,
+                })
                 .catch((error: unknown) => {
                   const alreadyAnsweredElsewhere =
                     error instanceof Error && error.message === 'These questions are no longer open'
@@ -932,7 +934,10 @@ export default (host: ExtensionHost) => {
               await api.memo('settled', true, ctx)
             }
           } else if (dismiss) await host.need(MessagesApi).dismiss(message, ctx, undefined, call)
-          else await host.need(MessagesApi).answer(message, text!, ctx, undefined, call, true)
+          else
+            await host
+              .need(MessagesApi)
+              .answer(message, text!, ctx, undefined, call, { whole: true })
           if (!toMain)
             await writeDisplayOnlyEntry(
               host,

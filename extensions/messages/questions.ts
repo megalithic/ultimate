@@ -6,7 +6,7 @@ import { formatAgo } from '../../lib/ago.ts'
 import { openQuestion } from '../../lib/message-state.ts'
 import { Messages } from './api.ts'
 import { Standing } from '../subagents/api.ts'
-import type { Message } from './api.ts'
+import type { AnswerScope, Message } from './api.ts'
 import type { Question } from './refs.ts'
 import { answersNamedAtLineStart, numberOf } from '../../lib/question-answers.ts'
 
@@ -111,15 +111,15 @@ const named = (questions: readonly Question[], index: number) =>
 export function answerNamedQuestionsReturningOpen(
   message: Message,
   text: string,
-  settlesWholeWhenNamingNone: boolean,
+  scope: AnswerScope,
 ) {
   const questions = message.questions ?? []
-  const given = answersNamedAtLineStart(text, questions)
+  const given = scope.given ?? answersNamedAtLineStart(text, questions)
   for (const index of Object.keys(given).map(Number))
     if (message.answered && index in message.answered)
       throw new Error(`Question ${named(questions, index)} is already answered`)
   const namesAny = Object.keys(given).length > 0
-  if (!questions.length || (settlesWholeWhenNamingNone && !namesAny)) {
+  if (!questions.length || (scope.whole && !namesAny)) {
     message.state = 'answered'
     return []
   }
