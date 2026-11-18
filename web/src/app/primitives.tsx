@@ -173,7 +173,7 @@ function Overlay({
   )
 }
 
-export const [sidebarWidth, sidebarWidthBeyondPhone] = ['w-72', 'md:w-72'] as const
+export const [sidebarWidth, sidebarMinWidthBeyondPhone] = ['w-72', 'md:min-w-72'] as const
 
 export function Sidebar() {
   useMountRegionBeforePaint('sidebar')

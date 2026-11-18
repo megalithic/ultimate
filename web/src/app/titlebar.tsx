@@ -18,7 +18,7 @@ import { useExtensions, useStore, useSystem } from '../sdk/hooks.ts'
 import { HOME, slotItems, surfaceItems } from '../sdk/registry.ts'
 import { ExtensionBoundary, Slot } from './boundary.tsx'
 import { Shortcut } from './palette.tsx'
-import { sidebarWidthBeyondPhone as alignSurfaceTabsWithSidebar } from './primitives.tsx'
+import { sidebarMinWidthBeyondPhone as alignSurfaceTabsWithSidebar } from './primitives.tsx'
 
 export function projectTitle(system: SystemInfo | undefined) {
   if (!system) return undefined
@@ -184,7 +184,7 @@ function Brand() {
             title="Switch surface"
             type="button"
           >
-            {name}
+            <span className="max-w-[50vw] truncate">{name}</span>
             {current && current.id !== HOME && (
               <span className="flex items-center gap-1.5 text-[12px] font-medium tracking-normal text-foreground">
                 {Icon && <Icon className="size-3.5 text-muted-foreground" />}
