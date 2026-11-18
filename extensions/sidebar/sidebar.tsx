@@ -537,6 +537,7 @@ function Tree({
     openBranches.map((branch) => branch.id),
     expanded,
     folded,
+    roots,
   )
   const toggleFlights =
     flightParents.length > 0 ? (

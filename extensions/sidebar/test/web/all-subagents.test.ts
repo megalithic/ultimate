@@ -13,17 +13,18 @@ it('names each conversation with owned children once', () => {
   expect(subagentParents(conversations)).toEqual([1, 2])
 })
 
-it('counts an in-flight group open unless folded, and only tree groups outside flights by expanded', () => {
+it('counts an in-flight group open unless folded, and only shown tree groups outside flights by expanded', () => {
   const children = new Map([
     [1, [{ id: 2 }]],
     [2, [{ id: 4 }]],
     [7, [{ id: 8 }]],
+    [9, [{ id: 10 }]],
   ])
-  const afterExpandAll = { expanded: [1, 2, 7], folded: [] as number[] }
-  expect(anySubagentsOpen(children, [1], afterExpandAll.expanded, afterExpandAll.folded)).toBe(true)
-  expect(anySubagentsOpen(children, [1], [1, 2], [1])).toBe(false)
-  expect(anySubagentsOpen(children, [1], [1, 2, 7], [1])).toBe(true)
-  expect(anySubagentsOpen(children, [1], [], [])).toBe(true)
+  const roots = new Set([9])
+  expect(anySubagentsOpen(children, [1], [1, 2, 7, 9], [], roots)).toBe(true)
+  expect(anySubagentsOpen(children, [1], [1, 2, 9], [1], roots)).toBe(false)
+  expect(anySubagentsOpen(children, [1], [1, 2, 7, 9], [1], roots)).toBe(true)
+  expect(anySubagentsOpen(children, [1], [], [], roots)).toBe(true)
 })
 
 it('expands every group, or folds every in-flight group and closes every tree group', () => {
