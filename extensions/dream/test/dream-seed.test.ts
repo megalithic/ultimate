@@ -178,6 +178,21 @@ async function fixture() {
           reply: true,
           state: 'delivered',
         })
+        // Open and partly answered: only the questions still open carry over.
+        board.messages.push({
+          id: 104,
+          from: 1 as ConversationId,
+          to: 'user',
+          text: 'Question 104',
+          at: 1,
+          reply: true,
+          state: 'delivered',
+          questions: [
+            { text: 'Land 104?', kind: 'confirm', ref: '1' },
+            { text: 'Ship 104?', kind: 'confirm', ref: '2' },
+          ],
+          answered: { 0: 'Yes' },
+        })
       }, context)
     },
   }
@@ -209,7 +224,7 @@ it('carries the seed into a fresh chapter once, including user memory, the hando
   expect(seed.counts).toEqual({
     memories: 3,
     todos: 1,
-    questions: 2,
+    questions: 3,
     automations: 1,
     scripts: 2,
   })
@@ -221,6 +236,7 @@ it('carries the seed into a fresh chapter once, including user memory, the hando
   expect(seed.questions).toEqual([
     { text: 'Choose 100?', ref: '#100' },
     { text: 'Question 103', ref: '#103' },
+    { text: 'Ship 104?', ref: '#104' },
   ])
   expect(seed.todos).toEqual([{ text: 'Keep this', owner: 'ultimate' }])
   expect(seed.automations).toEqual([
@@ -247,12 +263,13 @@ it('carries the seed into a fresh chapter once, including user memory, the hando
     { text: 'Keep this', owner: 'ultimate' },
     { text: 'Open question (the-beginning#100): Choose 100?', owner: 'user' },
     { text: 'Open question (the-beginning#103): Question 103', owner: 'user' },
+    { text: 'Open question (the-beginning#104): Ship 104?', owner: 'user' },
     {
       text: 'Recreate script A1 (Watch it): Watch the build · prompt: Summarise',
       owner: 'ultimate',
     },
   ])
-  expect(after.todos.next).toBe(5)
+  expect(after.todos.next).toBe(6)
   expect(after.seed.applied).toBeGreaterThan(0)
   expect(after.seed.automations).toEqual(['Daily'])
   const chapterEntries = async () => {
@@ -279,7 +296,7 @@ it('carries the seed into a fresh chapter once, including user memory, the hando
   expect(JSON.stringify(entry.model)).toContain(PREPARED.handoff)
   expect(JSON.stringify(entry.model)).toContain('continue that work')
   expect(JSON.stringify(entry.model)).toContain(
-    '3 memories, 1 todos, 2 questions, 1 automations, 2 scripts',
+    '3 memories, 1 todos, 3 questions, 1 automations, 2 scripts',
   )
   // Simulate the crash window: creation committed but dream did not record its automation receipt.
   await f.harness.commit(async (tx) => {

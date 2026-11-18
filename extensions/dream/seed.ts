@@ -84,8 +84,13 @@ export async function buildSeed(host: ExtensionHost, prepared: Prepared): Promis
     for (const message of (await tx.doc(Messages, ROOT_CONVERSATION_ID)).messages) {
       if (!openQuestion(message)) continue
       const ref = `#${message.id}`
+      const answered = message.answered ?? {}
       if (message.questions?.length)
-        for (const { text } of message.questions) questions.push({ text, ref })
+        questions.push(
+          ...message.questions.flatMap(({ text }, index) =>
+            index in answered ? [] : [{ text, ref }],
+          ),
+        )
       else questions.push({ text: message.text, ref })
     }
     for (const slug of about)
