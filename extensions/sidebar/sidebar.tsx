@@ -59,7 +59,7 @@ import type { KeptWork } from '../conversations/types.ts'
 import { LanderState } from './lander.tsx'
 import { StandingPhase, WaitingOnUser } from './ultimate.tsx'
 import { setAllSubagents, useShell, useSidebarState } from './state.tsx'
-import { topLevelRows } from './listed.ts'
+import { anySubagentsOpen, topLevelRows } from './listed.ts'
 import { UnderUltimate, Unlisted } from './ui.tsx'
 
 const useShownId = () => useStore((state) => state.view?.conversation.id ?? state.requested)
@@ -529,12 +529,15 @@ function Tree({
       flightSubagents(branch.id),
     ],
   }))
-  const flightParents: number[] = openBranches
+  const flightParents = openBranches
     .map((branch) => branch.id)
     .filter((id) => childrenByParent.has(id))
-  const anyFlightOpen =
-    flightParents.some((id) => !folded.includes(id)) ||
-    expanded.some((id) => childrenByParent.has(id) && !flightParents.includes(id))
+  const anyFlightOpen = anySubagentsOpen(
+    childrenByParent,
+    openBranches.map((branch) => branch.id),
+    expanded,
+    folded,
+  )
   const toggleFlights =
     flightParents.length > 0 ? (
       <button

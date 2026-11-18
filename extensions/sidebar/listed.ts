@@ -20,6 +20,24 @@ export const subagentParents = (
   ),
 ]
 
+export const anySubagentsOpen = (
+  childrenByParent: ReadonlyMap<number, readonly { id: number }[]>,
+  flights: readonly number[],
+  expanded: readonly number[],
+  folded: readonly number[],
+) => {
+  const flightTrees = new Set<number>()
+  const visit = (id: number) => {
+    flightTrees.add(id)
+    for (const child of childrenByParent.get(id) ?? []) visit(child.id)
+  }
+  flights.forEach(visit)
+  return (
+    flights.some((id) => childrenByParent.has(id) && !folded.includes(id)) ||
+    expanded.some((id) => childrenByParent.has(id) && !flightTrees.has(id))
+  )
+}
+
 export const allSubagents = (parents: readonly number[], open: boolean) => ({
   expanded: open ? [...parents] : [],
   folded: open ? [] : [...parents],
