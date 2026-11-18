@@ -36,7 +36,7 @@ agents (label `agent`) by ID. These rows are never concluded or hidden and show 
 and the age of its latest landing (what landed is its Landed section's first row); other agents show `working` or `idle` and the age. Their menu only
 compacts the context; they are never renamed, cleared or concluded.
 
-Beyond a phone the title bar's ULTIMATE wordmark (`titlebar.brand`) opens @ultimate too.
+Beyond a phone the title bar's wordmark (`titlebar.brand`, the project name in capitals) opens @ultimate too.
 @ultimate's mark and line (`waits on you`) are amber while questions wait on you; the Inbox row under it says how many
 and lists them (`extensions/inbox`). On
 phones, where the sidebar is hidden, the title bar's `@ultimate` button (`titlebar.left`) opens @ultimate from every

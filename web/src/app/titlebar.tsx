@@ -114,18 +114,30 @@ export const ProjectChip = forwardRef<
 })
 
 function Project() {
+  const system = useSystem()
   const replaced = slotItems(useExtensions(), 'titlebar.project').length > 0
-  return replaced ? <Slot name="titlebar.project" variant="inline" /> : <ProjectChip />
+  if (replaced) return <Slot name="titlebar.project" variant="inline" />
+  const preview =
+    system && !system.persistence.path.startsWith(`${system.machine.home}/.ultimate/projects/`)
+  return preview ? (
+    <span className="min-w-0 shrink-[100] truncate px-1 max-md:hidden">preview</span>
+  ) : null
 }
 
 const wordmark =
   'flex shrink-0 items-center gap-2 rounded-sm px-1 font-sans text-[11px] font-semibold tracking-[0.28em] text-brand'
 
+function useBrandName() {
+  const system = useSystem()
+  return { name: projectName(system).toUpperCase() || 'ULTIMATE', root: system?.project.root }
+}
+
 export function Wordmark({ onClick, label }: { onClick?: () => void; label?: string }) {
+  const { name, root } = useBrandName()
   if (!onClick)
     return (
-      <span className={wordmark} data-ui="wordmark">
-        ULTIMATE
+      <span className={wordmark} data-ui="wordmark" title={root}>
+        {name}
       </span>
     )
   return (
@@ -141,7 +153,7 @@ export function Wordmark({ onClick, label }: { onClick?: () => void; label?: str
           onClick={onClick}
           type="button"
         >
-          ULTIMATE
+          {name}
         </button>
       </TooltipTrigger>
       {label && <TooltipContent>{label}</TooltipContent>}
@@ -155,6 +167,7 @@ function Brand() {
   const current = surfaces.find((surface) => surface.id === shown)
   const Icon = current?.icon
   const replaced = slotItems(useExtensions(), 'titlebar.brand').length > 0
+  const { name } = useBrandName()
   return (
     <>
       <span className="contents max-md:hidden">
@@ -171,7 +184,7 @@ function Brand() {
             title="Switch surface"
             type="button"
           >
-            ULTIMATE
+            {name}
             {current && current.id !== HOME && (
               <span className="flex items-center gap-1.5 text-[12px] font-medium tracking-normal text-foreground">
                 {Icon && <Icon className="size-3.5 text-muted-foreground" />}
