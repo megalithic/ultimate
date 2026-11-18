@@ -273,6 +273,7 @@ function StoppedRow({
 }) {
   const [doing, setDoing] = useState<'starting' | 'forgetting'>()
   const [error, setError] = useState<string>()
+  const [started, setStarted] = useState<string>()
   const name = prettyName(project.name)
   const ago = project.lastActive && formatAgo(project.lastActive, Date.now(), { ago: true })
   const title = [
@@ -281,6 +282,7 @@ function StoppedRow({
     project.repo?.name,
     'stopped',
     ago && `last active ${ago}`,
+    started,
     error,
   ]
     .filter(Boolean)
@@ -288,9 +290,10 @@ function StoppedRow({
   const run = (what: 'starting' | 'forgetting') => {
     setDoing(what)
     setError(undefined)
+    setStarted(undefined)
     const action =
       what === 'starting'
-        ? api.action(StartAction, { home: project.home })
+        ? api.action(StartAction, { home: project.home }).then(({ output }) => setStarted(output))
         : api.action(ForgetAction, { home: project.home })
     action
       .then(refresh)
@@ -331,6 +334,8 @@ function StoppedRow({
                 <span className="text-brand">{doing}…</span>
               ) : error ? (
                 <span className="truncate text-destructive">{error}</span>
+              ) : started ? (
+                <span className="truncate text-brand">{started}</span>
               ) : (
                 <>
                   {project.repo && <RepoLabel className="min-w-0 opacity-70" repo={project.repo} />}
