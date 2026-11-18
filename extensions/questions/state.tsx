@@ -1,5 +1,5 @@
 import type { Question } from '../messages/refs.ts'
-import { choices } from '../../lib/question-cards.ts'
+import { choices, draftFor } from '../../lib/question-cards.ts'
 import type { Draft } from '../../lib/question-cards.ts'
 
 export {
@@ -34,6 +34,15 @@ export function answerOf(question: Question, draft: Draft | undefined) {
     return draft.text?.trim() ?? ''
   const labels = labelsIncludingTypedMultiAnswer(question, draft)
   return question.kind === 'multi' ? labels.join(', ') : (labels[0] ?? '')
+}
+
+export function sentDraft(question: Question, given: string | string[]): Draft {
+  try {
+    return draftFor(question, given)
+  } catch {
+    const text = [given].flat().join(', ')
+    return question.kind === 'text' ? { chosen: [], text } : { chosen: [], other: true, text }
+  }
 }
 
 export const answered = (questions: Question[], drafts: Record<number, Draft | undefined>) =>

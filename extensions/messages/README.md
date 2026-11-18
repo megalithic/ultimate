@@ -65,8 +65,10 @@ open, @ultimate's message to the user answers it and, with `questions`, stays op
 another.
 
 A reply-expected message to the user stays open, and its sender shows as awaiting reply, until the user answers that
-message: a Reply with `re` (the answer card or a typed Reply). The delivered input reads `Answer to message N:` before
-the reply, so an asker with several cards open never guesses which one it answers; a spoken (voice) reply answers no
+message: a Reply with `re` (the answer card or a typed Reply). With `questions`, a reply answers only the questions it
+names and the message stays open until every one is answered (see [Questions](../questions/README.md)); the reply then
+carries the numbers still `open`. The delivered input reads `Answer to message N:` (with `; questions 2, 3 are still
+open on the card, unanswered` while some are) before the reply, so an asker with several cards open never guesses which one it answers; a spoken (voice) reply answers no
 card while several are open. Dismissing it closes it with a one-way note to the sender. A branch's question also puts an attention pointer (`board.asked`) in @ultimate's conversation, and the user's
 answer a `board.answered` note there; neither starts a run. A branch with an open question shows as `waits on you`.
 
@@ -139,6 +141,7 @@ are a conversation id, `'user'` or `'remote'`; `state` is `sent`, `delivered`, `
   recent top-level conversation summaries.
 - `settle({ messageId, text, dismiss? }) → { id }`: from @ultimate's conversation or its side chat, settles the user's
   open question for them from what they said there. `text` is their answer (with `dismiss`, why it no longer matters);
+  a text that names questions by number settles only those, one that names none settles the whole message;
   the reply records `via`, so the card reads "@ultimate answered for you". Refused for other callers and closed
   messages.
 

@@ -17,6 +17,7 @@ import { Started } from '../extensions/messages/addresses.ts'
 import { Messages } from '../extensions/messages/api.ts'
 import type { Question } from '../extensions/messages/api.ts'
 import { checkQuestions } from '../extensions/messages/questions.ts'
+import { answersNamedAtLineStart } from '../lib/question-answers.ts'
 import questionsExtension, {
   actions,
   answerText,
@@ -323,19 +324,34 @@ describe('questions on a message', () => {
     ).rejects.toThrow('These questions are no longer open')
   })
 
-  it('sends a note on its own, and free text for a message without questions', async () => {
+  it('sends a note on its own, leaving every question open, and free text for a message without questions', async () => {
     const f = await fixture()
     const id = await f.ultimate()
     const { message } = await f.ask(id, { text: 'Decide these.', questions: decisions })
     await expect(f.answer({ messageId: message!.id, answers: [], note: '  ' })).rejects.toThrow(
       'Invalid answers',
     )
-    await f.answer({ messageId: message!.id, answers: [], note: 'Later, after the demo.' })
+    // The bug: a note asking something back closed every question it never answered.
+    await f.answer({ messageId: message!.id, answers: [], note: 'Before I answer: why 5?' })
     await f.settled()
-    expect((await f.log()).messages.find((m) => m.re === message!.id)?.text).toBe(
-      'Later, after the demo.',
-    )
-    const plain = (await f.ask(id, { text: 'What should the tab be called?' })).message!
+    const log = (await f.log()).messages
+    expect(log.find((m) => m.re === message!.id)).toMatchObject({
+      text: 'Before I answer: why 5?',
+      open: ['1', '2', '3', '4', '5'],
+    })
+    expect(log.find((m) => m.id === message!.id)).toMatchObject({ state: 'delivered' })
+    expect(log.find((m) => m.id === message!.id)?.answered).toBeUndefined()
+    expect(
+      f.observed.some((text) =>
+        text.includes(
+          `Answer to message ${message!.id}; questions 1, 2, 3, 4, 5 are still open on the card, unanswered:\nBefore I answer: why 5?`,
+        ),
+      ),
+    ).toBe(true)
+    await f.answer({ messageId: message!.id, text: 'Free text naming no question' })
+    expect((await f.log()).messages.find((m) => m.id === message!.id)?.state).toBe('delivered')
+    await f.ask(id, { text: 'What should the tab be called?' })
+    const plain = (await f.log()).messages.find((m) => m.text === 'What should the tab be called?')!
     expect(plain.questions).toBeUndefined()
     await expect(f.answer({ messageId: plain.id, text: '  ' })).rejects.toThrow('Invalid answers')
     await expect(f.answer({ messageId: plain.id, text: 'x', note: 'y' })).rejects.toThrow(
@@ -373,12 +389,51 @@ describe('questions on a message', () => {
       ),
     )
     expect(typed[typed.indexOf(note) + 1]).toMatchObject({ kind: 'pi.user' })
-    await f.answer({ messageId: message!.id, answers: [{ question: 'Land it?', answer: 'No' }] })
-    expect((await f.log()).messages.find((m) => m.id === message!.id)?.state).toBe('answered')
+    await f.answer({
+      messageId: message!.id,
+      answers: [{ question: 'Land it?', answer: 'No' }],
+      note: 'And 5: Cards',
+    })
     await f.settled()
+    expect((await f.log()).messages.find((m) => m.id === message!.id)).toMatchObject({
+      state: 'delivered',
+      answered: { 2: 'No' },
+    })
+    await expect(
+      f.answer({ messageId: message!.id, answers: [{ question: 'Land it?', answer: 'Yes' }] }),
+    ).rejects.toThrow('Question 3 is already answered')
+    await f.type(id, 'Still deciding')
+    expect(
+      (await f.entries(id)).findLast((entry) => entry.kind === 'board.open')?.model?.[0]?.content,
+    ).toContain(
+      `- message ${message!.id}: questions 1. Scope; 2. Suites; 4. How finished is it?; 5. Name (asked`,
+    )
+    await f.answer({
+      messageId: message!.id,
+      text: '1b\n2a,c. Suites\n4: 3\n\n5: Cards',
+    })
+    await f.settled()
+    expect((await f.log()).messages.find((m) => m.id === message!.id)).toMatchObject({
+      state: 'answered',
+      answered: { 0: 'the format only', 1: ['unit', 'lint'], 2: 'No', 3: '3', 4: 'Cards' },
+    })
+    expect((await f.log()).messages.findLast((m) => m.re === message!.id)?.open).toBeUndefined()
     const count = (await f.entries(id)).filter((entry) => entry.kind === 'board.open').length
     await f.type(id, 'Thanks')
     expect((await f.entries(id)).filter((entry) => entry.kind === 'board.open')).toHaveLength(count)
+  })
+
+  it('dismisses a partly answered message whole', async () => {
+    const f = await fixture()
+    const id = await f.ultimate()
+    const { message } = await f.ask(id, { text: 'Decide these.', questions: decisions })
+    await f.answer({ messageId: message!.id, answers: [{ question: 'Name', answer: 'Cards' }] })
+    await f.dismiss(message!.id)
+    await f.settled()
+    expect((await f.log()).messages.find((m) => m.id === message!.id)).toMatchObject({
+      state: 'dismissed',
+      answered: { 4: 'Cards' },
+    })
   })
 
   it('dismisses one open question with a one-way note that starts no run, leaving the others open', async () => {
@@ -457,6 +512,31 @@ describe('settling for the user', () => {
       'These questions are no longer open',
     )
   })
+
+  it('settles only the questions its text names, and the whole message when it names none', async () => {
+    const f = await fixture()
+    const id = await f.ultimate()
+    const asker = await f.branch(id)
+    const { message } = await f.ask(asker, {
+      text: 'Decide.',
+      questions: decisions.slice(0, 3),
+    })
+    await f.settle(id, { messageId: message!.id, text: '3: Yes' })
+    await f.settled()
+    expect((await f.log()).messages.find((m) => m.id === message!.id)).toMatchObject({
+      state: 'delivered',
+      answered: { 2: 'Yes' },
+    })
+    expect(
+      (await f.entries(id)).some(
+        (entry) =>
+          entry.kind === 'board.answered' &&
+          JSON.stringify(entry.model).includes('questions 1, 2 are still open on the card'),
+      ),
+    ).toBe(true)
+    await f.settle(id, { messageId: message!.id, text: 'Go with what you recommended.' })
+    expect((await f.log()).messages.find((m) => m.id === message!.id)?.state).toBe('answered')
+  })
 })
 
 describe('answer text', () => {
@@ -496,6 +576,30 @@ describe('answer text', () => {
       ),
     ).toBe('Land it?: Yes')
     expect(answerText([], decisions, 'Just a thought.')).toBe('Just a thought.')
+  })
+
+  it('names back the questions a reply answers, as answerText writes them or as typed at a line start', () => {
+    const unnumbered: Question[] = [
+      { text: 'Land it?', kind: 'confirm' },
+      { text: 'Which **layout**?\nSee the preview.', kind: 'text' },
+    ]
+    const written = answerText(
+      [
+        { question: 'Land it?', answer: 'No' },
+        { question: 'Which **layout**?\nSee the preview.', answer: 'Grid' },
+      ],
+      unnumbered,
+      'Note: 1. also the docs',
+    )
+    expect(answersNamedAtLineStart(written, unnumbered)).toEqual({ 0: 'No', 1: 'Grid' })
+    expect(
+      answersNamedAtLineStart(
+        '1: neither\n2a,c. Suites: unit, lint\n3 more things: later\n4\n5. Cards',
+        decisions,
+        { 4: 'Questions' },
+      ),
+    ).toEqual({ 0: 'neither', 1: ['unit', 'lint'] })
+    expect(answersNamedAtLineStart('Before I answer: why 5?', decisions)).toEqual({})
   })
 
   it('drops fields that do not apply to a kind and trims what it keeps', () => {

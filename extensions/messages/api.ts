@@ -50,6 +50,10 @@ export type Message = {
   ownerSettled?: true
   /** The questions a reply-expected message to the user asks, answered on its card. */
   questions?: Question[]
+  /** Its questions answered so far, by index: option labels, or the words the answer gave. */
+  answered?: Record<number, string | string[]>
+  /** On the user's answer to questions: the numbers of those it left open. */
+  open?: string[]
   /** A user answer or dismissal that @ultimate settled for the user, not their own click. */
   via?: Via
 }
@@ -68,7 +72,9 @@ export type MessagesService = {
   /**
    * Reply `text` from the user to open message `messageId`, from browser `device`; returns the reply's message
    * id. Records a `user.input` event. With `call` (a tool call), a receipt commits with the reply, and a replay of
-   * that call returns the same id even though the question is closed by then.
+   * that call returns the same id even though the question is closed by then. A text answers the message's questions
+   * it names by number, and leaves the others open; with `whole` (an agent relaying the user's explicit answer to
+   * this message), a text that names none answers them all.
    */
   answer(
     messageId: number,
@@ -76,6 +82,7 @@ export type MessagesService = {
     ctx: Context,
     device?: Device,
     call?: { taskId: TaskId; callId: string },
+    whole?: boolean,
   ): Promise<number>
   /**
    * The messages that wait on the user's answer, oldest first: each one's id, the conversation that asked, when, and its

@@ -1509,14 +1509,14 @@ it('lets a branch ask the user directly and leaves passive question and answer n
   const after = await f.opened.root.context(context)
   expect(after.entries.filter((entry) => entry.kind === 'pi.assistant')).toHaveLength(generations)
 
-  const text = 'Q: Use the smaller change?\nA: Yes'
+  const text = 'Use the smaller change?: Yes'
   await f.service().answer(question.id, text, context)
   await until(async () => (await entries('board.answered')).length === 1)
   await b.settled()
   const [answered] = await entries('board.answered')
   expect(answered.data).toMatchObject({ message: question.id, from: b.id })
   expect(answered.input).not.toBe(true)
-  expect(JSON.stringify(answered.model)).toContain('A: Yes')
+  expect(JSON.stringify(answered.model)).toContain('change?: Yes')
   const reply = (await f.log())!.messages.find((m) => m.from === 'user' && m.re === question.id)!
   expect(reply).toMatchObject({ to: b.id, text, state: 'answered', entry: expect.any(Number) })
   expect(f.observed).toContainEqual(
@@ -1525,7 +1525,7 @@ it('lets a branch ask the user directly and leaves passive question and answer n
   // The user's answer is input, so the branch's final result still reports to its starter.
   expect((await b.from()).find((m) => m.report)).toMatchObject({
     to: 1,
-    text: expect.stringContaining('A: Yes'),
+    text: expect.stringContaining('change?: Yes'),
   })
   expect(await entries('board.asked')).toHaveLength(1)
   expect(await entries('board.answered')).toHaveLength(1)

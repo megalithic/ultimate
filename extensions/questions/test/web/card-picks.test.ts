@@ -68,3 +68,19 @@ it('shows again the picks, the note and the open question the user left', () => 
   // The question that was open opens again, with its own options.
   expect(html).toContain('Yes')
 })
+
+it('shows the questions already answered as sent, and opens on one still open', () => {
+  shell.cards = { 'message:5': { drafts: {}, note: '', current: 0, text: '' } }
+  const html = renderToStaticMarkup(
+    createElement(MessageQuestions, {
+      message: { ...message, answered: { 0: 'Status line' } },
+      keys: false,
+    }),
+  )
+  expect(html).toContain('1/2')
+  expect(html).toContain('Status line')
+  expect(html).toContain('· sent')
+  expect(html.match(/data-current=""[^>]*>\s*<legend class="sr-only">([^<]*)</)?.[1]).toBe(
+    'Land it?',
+  )
+})

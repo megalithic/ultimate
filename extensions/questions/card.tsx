@@ -38,6 +38,7 @@ import {
   choiceForKey,
   choices,
   keyOf,
+  sentDraft,
 } from './state.tsx'
 import type { CardState, Draft } from './state.tsx'
 
@@ -90,6 +91,12 @@ export function MessageQuestions({
   const card = cardKey(message.id)
   const shown = useKeys(card)
   if (!waitsOnUser(message)) return null
+  const sent = Object.fromEntries(
+    Object.entries(message.answered ?? {}).flatMap(([index, given]) => {
+      const question = questions[Number(index)]
+      return question ? [[index, sentDraft(question, given)]] : []
+    }),
+  ) as Record<number, Draft>
   const answer = (reply: Reply, keepalive?: boolean) =>
     answerWith
       ? answerWith(reply, keepalive)
@@ -98,6 +105,7 @@ export function MessageQuestions({
     <Card
       card={card}
       questions={questions}
+      sent={sent}
       keys={questions.length > 0 && (keys ?? shown)}
       submit={(answers, note, keepalive) =>
         answer({ answers, ...(note ? { note } : {}) }, keepalive)
@@ -338,6 +346,7 @@ function Note({
 function Card({
   card,
   questions,
+  sent,
   keys,
   submit,
   reply,
@@ -348,6 +357,7 @@ function Card({
 }: {
   card: string
   questions: Question[]
+  sent: Record<number, Draft>
   keys: boolean
   submit: (answers: Answer[], note?: string, keepalive?: boolean) => Promise<unknown>
   reply: (text: string) => Promise<unknown>
@@ -358,12 +368,22 @@ function Card({
 }) {
   const [state, setState] = useDurableCard(card, questions)
   const [lockedIn, setLockedIn] = useState<Pick<CardState, 'drafts' | 'note'>>()
-  const { drafts, note } = lockedIn ?? state
-  const { current, text } = state
+  const { note } = lockedIn ?? state
+  const unsent = Object.fromEntries(
+    Object.entries((lockedIn ?? state).drafts).filter(([index]) => !(index in sent)),
+  ) as Record<number, Draft>
+  const drafts = { ...unsent, ...sent }
+  const openAt = questions.flatMap((_, index) => (index in sent ? [] : [index]))
+  const current = state.current in sent ? (openAt[0] ?? 0) : state.current
+  const { text } = state
   const root = useRef<HTMLDivElement>(null)
   const [phase, setPhase] = useState<Phase>('answering')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const [sentReply, setSentReply] = useState<number>()
+  const replyInLog = useDocOf(ROOT, MessagesDoc)?.messages.some(
+    (message) => message.id === sentReply,
+  )
 
   const undoWindowSend = useRef<{
     cancel: Cancel
@@ -375,8 +395,10 @@ function Card({
   const phone = useViewport() === 'phone'
   const hints = keys && !phone
   const words = questions.map((question, index) => answerOf(question, drafts[index]))
-  const ready = answered(questions, drafts)
+  const ready = answered(questions, unsent)
   const locked = phase !== 'answering'
+  const nextOpen = (from: number, step: 1 | -1) =>
+    step > 0 ? openAt.find((index) => index > from) : openAt.findLast((index) => index < from)
 
   useEffect(() => {
     const flushWithKeepaliveOnPagehide = () => flushUndoWindowSend(undoWindowSend, true)
@@ -394,6 +416,7 @@ function Card({
         ?.querySelector<HTMLInputElement>(`[data-question="${index}"] input`)
         ?.focus({ preventScroll: true }),
     )
+  const move = (step: 1 | -1) => go(nextOpen(current, step) ?? current)
   const go = (index: number) => {
     cancelAdvanceAfterCheck.current?.()
     const next = Math.min(questions.length - 1, Math.max(0, index))
@@ -428,10 +451,9 @@ function Card({
     )
 
     cancelAdvanceAfterCheck.current?.()
-    if (click && !choice.custom && index < questions.length - 1)
-      cancelAdvanceAfterCheck.current = deadline(CHECK_LANDING_BEFORE_ADVANCE_MS, () =>
-        go(index + 1),
-      )
+    const after = nextOpen(index, 1)
+    if (click && !choice.custom && after !== undefined)
+      cancelAdvanceAfterCheck.current = deadline(CHECK_LANDING_BEFORE_ADVANCE_MS, () => go(after))
   }
 
   const run = async (action: () => Promise<unknown>) => {
@@ -457,7 +479,12 @@ function Card({
       setPhase('sending')
       setError(undefined)
       submit(ready, extra || undefined, keepalive).then(
-        () => setPhase('sent'),
+        (sentMessage) => {
+          setPhase('sent')
+          setState((old) => ({ ...old, note: '' }))
+          const id = (sentMessage as { id?: unknown } | undefined)?.id
+          if (typeof id === 'number') setSentReply(id)
+        },
         (failure: unknown) => {
           unlock()
           setError(errorMessage(failure))
@@ -473,6 +500,13 @@ function Card({
     setLockedIn(undefined)
     setPhase('answering')
   }
+  useEffect(() => {
+    if (!replyInLog) return
+    setSentReply(undefined)
+    committed.current = false
+    setLockedIn(undefined)
+    setPhase('answering')
+  }, [replyInLog])
   const now = flush
   const undo = () => {
     if (!undoWindowSend.current) return
@@ -484,7 +518,8 @@ function Card({
   const enter = () => {
     if (phase === 'undo') return now()
     if (phase !== 'answering') return
-    if (current < questions.length - 1 && ready.length < questions.length) return go(current + 1)
+    const next = nextOpen(current, 1)
+    if (next !== undefined && ready.length < openAt.length) return go(next)
     send()
   }
   const clear = () => {
@@ -506,7 +541,7 @@ function Card({
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       event.currentTarget.blur()
-      go(current + (event.key === 'ArrowDown' ? 1 : -1))
+      move(event.key === 'ArrowDown' ? 1 : -1)
     }
   }
 
@@ -547,12 +582,12 @@ function Card({
         select(current, choice)
       } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault()
-        go(current + (event.key === 'ArrowDown' ? 1 : -1))
+        move(event.key === 'ArrowDown' ? 1 : -1)
       } else if (event.key === 'Enter') {
         event.preventDefault()
         if (event.shiftKey) send(true)
         else enter()
-      } else if (event.key === 'Escape' && words[current]) {
+      } else if (event.key === 'Escape' && words[current] && !(current in sent)) {
         event.preventDefault()
         clear()
       } else if (event.key === '/') {
@@ -605,11 +640,10 @@ function Card({
       </form>
     )
 
-  const last = questions.length - 1
-
   const shown = questions[current]
   const shownKeys = shown ? [0, 1].flatMap((i) => keyOf(shown, i) ?? []) : []
-  const unanswered = questions.length - ready.length
+  const sentCount = questions.length - openAt.length
+  const unanswered = openAt.length - ready.length
   return (
     <div className={className} data-questions-card={card} ref={root}>
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 font-mono text-[11px] text-muted-foreground">
@@ -620,7 +654,7 @@ function Card({
         {questions.length > 1 && (
           <span className="ml-auto flex items-center gap-2">
             <span>
-              {ready.length}/{questions.length}
+              {sentCount + ready.length}/{questions.length}
             </span>
             <Progress done={words.map(Boolean)} />
           </span>
@@ -634,7 +668,8 @@ function Card({
               index={index}
               draft={drafts[index]}
               current={index === current}
-              disabled={busy || locked}
+              sent={index in sent}
+              disabled={busy || locked || index in sent}
               hints={hints}
               onOpen={() => go(index)}
               onSelect={(option) => select(index, option, true)}
@@ -682,9 +717,9 @@ function Card({
             )}
             <span className="flex items-center gap-1">
               <Key>↵</Key>
-              {current < last && unanswered ? 'next' : 'send'}
+              {nextOpen(current, 1) !== undefined && unanswered ? 'next' : 'send'}
             </span>
-            {words[current] && (
+            {words[current] && !(current in sent) && (
               <span className="flex items-center gap-1">
                 <Key>esc</Key> clear
               </span>
@@ -714,7 +749,7 @@ function Card({
               (!ready.length && note.trim()
                 ? 'Send note'
                 : unanswered && ready.length
-                  ? `Send ${ready.length} of ${questions.length}`
+                  ? `Send ${ready.length} of ${openAt.length}`
                   : 'Send')}
           </SendButton>
         </span>

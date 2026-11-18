@@ -61,6 +61,10 @@ export type Message = {
   interim?: true
   /** The questions a reply-expected message to the user asks, answered on its card. */
   questions?: Question[]
+  /** Its questions answered so far, by index: option labels, or the words the answer gave. */
+  answered?: Record<number, string | string[]>
+  /** On the user's answer to questions: the numbers of those it left open. */
+  open?: string[]
   /** A user answer or dismissal that @ultimate settled for the user, not their own click. */
   via?: Via
 }

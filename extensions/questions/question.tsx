@@ -190,6 +190,7 @@ export function QuestionItem({
   index,
   draft,
   current,
+  sent = false,
   disabled,
   hints,
   onOpen,
@@ -201,6 +202,7 @@ export function QuestionItem({
   index: number
   draft: Draft | undefined
   current: boolean
+  sent?: boolean
   disabled: boolean
   hints: boolean
   onOpen: () => void
@@ -323,6 +325,7 @@ export function QuestionItem({
                 <span className="truncate font-sans text-xs text-foreground/80">
                   {answer.words}
                 </span>
+                {sent && <span className="shrink-0">· sent</span>}
               </>
             ) : (
               <span className="whitespace-nowrap">not answered</span>

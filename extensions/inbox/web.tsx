@@ -107,7 +107,8 @@ function Row({
   selected: boolean
   onSelect: () => void
 }) {
-  const questions = entry.message?.questions
+  const answered = entry.message?.answered ?? {}
+  const questions = entry.message?.questions?.filter((_, index) => !(index in answered))
   const gist = entry.item ? entry.item.gist : questions?.[0]?.text.split('\n')[0]
   const more = (questions?.length ?? 0) > 1 ? ` +${questions!.length - 1}` : ''
   return (

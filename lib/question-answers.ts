@@ -51,6 +51,61 @@ export function answerText(answers: Answer[], questions: readonly Question[], no
   return lines.join('\n\n')
 }
 
+export type AnswersByQuestionIndex = Record<number, string | string[]>
+
+const position = (question: Question, index: number) => question.ref ?? String(index + 1)
+
+function givenOnLine(question: Question, index: number, line: string) {
+  const numbered = new RegExp(
+    `^${position(question, index)}([a-z](?:,[a-z])*)?(?:[.:]\\s*(.*))?$`,
+  ).exec(line)
+  if (numbered) {
+    const keys = numbered[1]?.split(',') ?? []
+    const labels = keys.flatMap(
+      (key) => (question.options ?? []).find((option) => option.key === key)?.label ?? [],
+    )
+    if (keys.length && labels.length === keys.length)
+      return question.kind === 'multi' ? labels : labels.join(', ')
+    const words = numbered[2]?.trim() ?? ''
+    const titled = `${question.text.split('\n')[0]}:`
+    return (words.startsWith(titled) ? words.slice(titled.length).trim() : words) || undefined
+  }
+  const prefix = `${question.text}:`
+  return line.startsWith(prefix) ? line.slice(prefix.length).trim() || undefined : undefined
+}
+
+function byMultilineText(question: Question, text: string) {
+  if (!question.text.includes('\n')) return undefined
+  const prefix = `${question.text}:`
+  const at = `\n${text}`.indexOf(`\n${prefix}`)
+  if (at < 0) return undefined
+  return (
+    text
+      .slice(at + prefix.length)
+      .split('\n')[0]
+      .trim() || undefined
+  )
+}
+
+export function answersNamedAtLineStart(
+  text: string,
+  questions: readonly Question[],
+  alreadyAnswered: AnswersByQuestionIndex = {},
+) {
+  const given: AnswersByQuestionIndex = {}
+  const lines = text.split('\n').map((line) => line.trim())
+  for (const [index, question] of questions.entries()) {
+    if (index in alreadyAnswered) continue
+    const found =
+      lines.reduce<string | string[] | undefined>(
+        (first, line) => first ?? givenOnLine(question, index, line),
+        undefined,
+      ) ?? byMultilineText(question, text)
+    if (found !== undefined) given[index] = found
+  }
+  return given
+}
+
 export function checkReply(input: { answers?: unknown; note?: unknown; text?: unknown }) {
   const optionalString = (value: unknown) => {
     if (value !== undefined && typeof value !== 'string') throw new Error('Invalid answers')

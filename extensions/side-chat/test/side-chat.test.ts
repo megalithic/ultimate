@@ -828,7 +828,7 @@ describe('side chats', () => {
     const message = board.messages.find((item) => item.text === 'Pick again')!
     const side = (await f.action('open', { message: message.id })).data.result.id
     await post(f.server, '/api/extensions/questions/actions/answer', {
-      args: { messageId: message.id, text: 'a' },
+      args: { messageId: message.id, answers: [{ question: 'Which?', answer: 'a' }] },
     })
     await writeFile(join(ultimateRoot, '.ultimate/settings.json'), JSON.stringify({}))
     try {

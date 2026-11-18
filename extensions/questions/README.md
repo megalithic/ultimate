@@ -28,10 +28,14 @@ or keys, an option that is "Something else"/"Other" (the card adds it), a scale 
 10 steps, and repeated question texts or refs. Fields that do not apply to a kind are dropped, text is trimmed.
 `questions` goes only with a reply-expected message to `user`.
 
-A question stays open until the user answers it (its card, or a Reply to that message) or dismisses it, or @ultimate
+Each question stays open until a reply to its message answers it: the card's answer, or a typed reply or note that
+names it at a line start, by number (`2: …`, `1b`, `2a,c. …`) or, when the message numbered nothing, by its text
+(`Scope: …`). A reply that names none (a note on its own, "before I answer, …") reaches the asker and leaves every
+question open. The message closes once all its questions are answered, when the user dismisses it, or when @ultimate
 settles it for them from what they said in its chat (messages' `settle`; the card then reads "@ultimate answered for
-you"). Typed input,
-answers to other messages and agent messages leave it open. While it is open, messages starts each of the asker's runs
+you"), which answers only the questions its text names, or all of them when it names none. The message stores what
+is answered (`answered`, by question index), and each reply lists the numbers still `open`; the asker reads them
+before the reply. Typed input, answers to other messages and agent messages leave it open. While it is open, messages starts each of the asker's runs
 with a line listing it by its questions (see [Messages](../messages/README.md)).
 
 ## Card
@@ -45,7 +49,9 @@ come already chosen: the card opens with them in its draft, on the first questio
 a note field is always there: whatever it holds goes after the answer lines, or on its own (“Send note”), and never
 changes a pick. Send sends what is answered (“Send 2 of 5”). Sending locks the card as it is and turns Send into
 **Undo**, which fills over a 3 s window before the answer goes out; Undo keeps the picks and the note. Holding Send for
-1 s fills it and sends at once, with no window; released earlier it is a plain click. With Reduce Motion the fills
+1 s fills it and sends at once, with no window; released earlier it is a plain click. While questions stay open after
+a send, the card comes back with the answered ones folded as `· sent` (locked; the keys and Enter skip them), the note
+cleared and the rest to answer (“Send 1 of 2” counts only those). With Reduce Motion the fills
 advance in steps. Dismiss closes the message without an answer. Beside it, the `questions.card-actions` point
 (`CardActions`) takes another extension's control: side-chat's **Talk it through**. A card in a layer marked
 `data-receded` (a transcript behind a side chat's sheet) takes no keys. A message without questions gets a one-line answer
@@ -73,7 +79,7 @@ Both are user-only.
 - `answer { messageId, answers: [{ question, answer }], note? }`, a multi answer as its list of labels, validates against the message's questions, refusing
   unknown or duplicate answers, and posts a normal user reply to the sender with `re: messageId`, one paragraph per
   answer in the message's own numbering: `1a. Topic: option` for an option, `2a,c. Topic: a, c` for several, `3: text` for typed text or a rating (`Topic: answer` when the message numbered
-  nothing), then `Note: …`; with no answers the note alone is the reply. Returns `{ id }`. `answer { messageId, text }`
+  nothing), then `Note: …`; with no answers the note alone is the reply. Answering a question already answered is refused. Returns `{ id }`. `answer { messageId, text }`
   posts `text` instead, for a message with or without questions. Messages admission atomically verifies that the
   original remains open, so concurrent answers produce exactly one reply; normal Messages delivery wakes the sender.
 - `dismiss { messageId }` marks the message `dismissed` and posts a one-way user note to the sender with `re`, in one

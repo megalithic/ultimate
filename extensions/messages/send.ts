@@ -6,7 +6,12 @@ import { Standing } from '../subagents/api.ts'
 import { Messages, MessageSent } from './api.ts'
 import type { Message, Question } from './api.ts'
 import type { Via } from './refs.ts'
-import { checkQuestions, gist, openQuestion } from './questions.ts'
+import {
+  answerNamedQuestionsReturningOpen,
+  checkQuestions,
+  gist,
+  openQuestion,
+} from './questions.ts'
 import { isOwed } from '../../lib/message-state.ts'
 import { UserInputEvent } from '../../shared/events.ts'
 import type { Device } from '../../shared/events.ts'
@@ -78,6 +83,7 @@ export async function send(
     routed?: EntryId
     echo?: boolean
     serveBranch?: true
+    whole?: boolean
   } = {},
 ) {
   const { taskId, callId, requestId, answerId, device, via } = options
@@ -145,9 +151,16 @@ export async function send(
       images = await resolveImages(tx, input.imagesFrom ?? from, input.images)
     }
 
+    let open: string[] = []
     if (from === 'user' && input.re !== undefined)
       for (const m of (await tx.doc(Messages, ROOT_CONVERSATION_ID)).messages)
-        if (openQuestion(m) && m.id === input.re) m.state = input.dismiss ? 'dismissed' : 'answered'
+        if (openQuestion(m) && m.id === input.re) {
+          if (input.dismiss) m.state = 'dismissed'
+          else open = answerNamedQuestionsReturningOpen(m, input.text, !!options.whole)
+        }
+    const stillOpen = open.length
+      ? ` (questions ${open.join(', ')} are still open on the card)`
+      : ''
     let re = input.re
     if (from !== 'user' && input.reply !== false) {
       const log = await tx.doc(Messages, ROOT_CONVERSATION_ID)
@@ -208,6 +221,7 @@ export async function send(
       ...(options.routed !== undefined ? { routed: options.routed } : {}),
       ...(options.echo ? { echo: true as const } : {}),
       ...(via ? { via } : {}),
+      ...(open.length ? { open } : {}),
     })
     await host.emit(tx, MessageSent, {
       message: message.id,
@@ -247,10 +261,10 @@ export async function send(
                     }),
               },
               content: via
-                ? `You settled #${to}'s questions (message ${answerId}) for the user${input.dismiss ? ', closed without an answer' : ''}.`
+                ? `You settled #${to}'s questions (message ${answerId}) for the user${input.dismiss ? ', closed without an answer' : ''}${stillOpen}.`
                 : input.dismiss
                   ? `The user dismissed #${to}'s questions (message ${answerId}).`
-                  : `The user answered #${to}'s questions (message ${answerId}):\n${input.text}`,
+                  : `The user answered #${to}'s questions (message ${answerId})${stillOpen}:\n${input.text}`,
             }
           : undefined
       if (notification)

@@ -11,6 +11,7 @@ export type Message = {
   reply: boolean
   state: string
   questions?: Question[]
+  answered?: Record<number, string | string[]>
 }
 
 export const waitsOnUser = (message: Message) => openQuestion(message)

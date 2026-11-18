@@ -8,6 +8,7 @@ import { Messages } from './api.ts'
 import { Standing } from '../subagents/api.ts'
 import type { Message } from './api.ts'
 import type { Question } from './refs.ts'
+import { answersNamedAtLineStart } from '../../lib/question-answers.ts'
 
 const optionSchema = obj({
   label: str({
@@ -104,9 +105,37 @@ export function checkQuestions(questions: Question[]): Question[] {
 
 export { openQuestion }
 
-export const gist = (message: Pick<Message, 'text' | 'questions'>) => {
-  const lines = message.questions?.length
-    ? [`questions ${message.questions.map((q, i) => `${q.ref ?? i + 1}. ${q.text}`).join('; ')}`]
+const position = (question: Question, index: number) => question.ref ?? String(index + 1)
+
+export function answerNamedQuestionsReturningOpen(
+  message: Message,
+  text: string,
+  settlesWholeWhenNamingNone: boolean,
+) {
+  const questions = message.questions ?? []
+  const given = answersNamedAtLineStart(text, questions, message.answered)
+  const namesAny = Object.keys(given).length > 0
+  if (!questions.length || (settlesWholeWhenNamingNone && !namesAny)) {
+    message.state = 'answered'
+    return []
+  }
+  if (namesAny) message.answered = { ...message.answered, ...given }
+  const answered = message.answered ?? {}
+  const open = questions.flatMap((question, index) =>
+    index in answered ? [] : [position(question, index)],
+  )
+  if (!open.length) message.state = 'answered'
+  return open
+}
+
+export const gist = (message: Pick<Message, 'text' | 'questions' | 'answered'>) => {
+  const open = message.questions?.flatMap((question, index) =>
+    message.answered && index in message.answered
+      ? []
+      : [`${position(question, index)}. ${question.text}`],
+  )
+  const lines = open?.length
+    ? [`questions ${open.join('; ')}`]
     : message.text
         .split('\n')
         .map((line) => line.replace(/\*\*/g, '').trim())
@@ -130,7 +159,7 @@ export async function openQuestionsNote(tx: Tx, conversationId: ConversationId, 
     )
     .join(
       '\n',
-    )}${canSettleEveryOpenQuestion ? `\nWhen the user decides one in your chat, settle it with ultimate.action('messages', 'settle', { messageId, text }).` : ''}`
+    )}${canSettleEveryOpenQuestion ? `\nWhen the user decides one in your chat, settle it with ultimate.action('messages', 'settle', { messageId, text }); a text that names questions by number ("2: …", "1b") settles only those.` : ''}`
   const perInputCacheReminder = {
     kind: 'board.open',
     data: { ids: open.map((m) => m.id) },

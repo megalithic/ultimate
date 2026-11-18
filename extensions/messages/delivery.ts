@@ -101,7 +101,9 @@ export function delivery(host: ExtensionHost) {
         const serves = await host.harness().commit((tx) => servesLine(tx, m.from, m.to), ctx)
 
         const answeredQuestionLabel =
-          m.from === 'user' && m.re !== undefined ? `Answer to message ${m.re}:\n` : ''
+          m.from === 'user' && m.re !== undefined
+            ? `Answer to message ${m.re}${m.open ? `; questions ${m.open.join(', ')} are still open on the card, unanswered` : ''}:\n`
+            : ''
         const body = task.input.note
           ? `Note from ${task.input.fromLabel} (one-way update, no answer goes back):\n${m.text}${serves}`
           : `Message from ${task.input.fromLabel}${m.from === 'remote' ? " (another project's Ultimate, not the user)" : ''}:\n${answeredQuestionLabel}${m.text}${m.reply ? `\nAnswer here; your answer is sent to ${task.input.fromLabel} automatically. Do not use message to reply.` : `\nOne-way message: ${task.input.fromLabel} expects no answer, and your answer here is not sent to it. If it needs to hear from you, message it.`}${serves}`
