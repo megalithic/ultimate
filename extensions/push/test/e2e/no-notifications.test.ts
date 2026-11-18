@@ -65,8 +65,13 @@ it('runs through an answered question without an error where the Notifications a
   const log = await server.harness.snapshot(Messages, ROOT_CONVERSATION_ID, context)
   const asked = log!.messages.find((message) => message.to === 'user')!
   await post(server, '/api/extensions/questions/actions/answer', {
-    args: { messageId: asked.id, text: 'yes' },
+    args: { messageId: asked.id, text: '1: Yes' },
   })
+  expect(
+    (await server.harness.snapshot(Messages, ROOT_CONVERSATION_ID, context))!.messages.find(
+      (message) => message.id === asked.id,
+    )?.state,
+  ).toBe('answered')
 
   const browser = await chromium.launch({
     executablePath: await browserBinary(),

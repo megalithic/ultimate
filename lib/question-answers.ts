@@ -53,6 +53,13 @@ export function answerText(answers: Answer[], questions: readonly Question[], no
 
 export type AnswersByQuestionIndex = Record<number, string | string[]>
 
+export function optionLetters(options: readonly { key?: string }[]) {
+  const taken = new Set(options.flatMap((option) => (option.key ? [option.key] : [])))
+  const free = 'abcdefghijklmnopqrstuvwxyz'.split('').filter((letter) => !taken.has(letter))
+  let next = 0
+  return options.map((option) => option.key ?? free[next++] ?? '')
+}
+
 function numberOf(questions: readonly Question[], index: number) {
   const own = questions[index].ref
   if (own !== undefined) return own
@@ -74,14 +81,11 @@ function givenOnLine(question: Question, number: string | undefined, line: strin
             { label: 'No', key: 'n' },
           ]
         : (question.options ?? [])
-    const options = listed.map((option, at) => ({
-      ...option,
-      key: option.key ?? String.fromCharCode(97 + at),
-    }))
+    const letters = optionLetters(listed)
     const labels = keys.map((key) => {
-      const option = options.find((candidate) => candidate.key === key)
-      if (!option) throw new Error(`Question ${number} has no option ${key}`)
-      return option.label
+      const at = letters.indexOf(key)
+      if (at < 0) throw new Error(`Question ${number} has no option ${key}`)
+      return listed[at].label
     })
     if (labels.length) return question.kind === 'multi' ? labels : labels.join(', ')
     const words = numbered[2]?.trim() ?? ''

@@ -32,6 +32,7 @@ import { formatAgo } from '../../lib/ago.ts'
 import { openQuestion } from '../../lib/message-state.ts'
 import { Messages, MessagesApi } from '../messages/api.ts'
 import type { Message, Question } from '../messages/api.ts'
+import { optionLetters } from '../../lib/question-answers.ts'
 import { Standing, SubagentsApi } from '../subagents/api.ts'
 import { ConversationsApi } from '../conversations/api.ts'
 import { LineageApi } from '../lineage/api.ts'
@@ -191,8 +192,8 @@ export function questionsText(questions: Question[], answered: Message['answered
             [
               `${q.ref ?? i + 1}. ${q.text}`,
               ...(q.options ?? []).map(
-                (o, j) =>
-                  `${o.key ?? String.fromCharCode(97 + j)}: ${o.label}${o.detail ? ` — ${o.detail}` : ''}${o.recommended ? ' (the asker’s pick)' : ''}`,
+                (o, j, all) =>
+                  `${optionLetters(all)[j]}: ${o.label}${o.detail ? ` — ${o.detail}` : ''}${o.recommended ? ' (the asker’s pick)' : ''}`,
               ),
               ...(q.scale
                 ? [

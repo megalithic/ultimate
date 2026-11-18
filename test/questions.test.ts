@@ -642,6 +642,23 @@ describe('answer text', () => {
     ]
     expect(answersNamedAtLineStart('1b\n2y', keyless)).toEqual({ 0: 'y', 1: 'Yes' })
     expect(() => answersNamedAtLineStart('1z', keyless)).toThrow('Question 1 has no option z')
+    // Explicit keys keep their letter; keyless options take the letters left over.
+    const mixedKeys: Question[] = [
+      {
+        text: 'Where?',
+        kind: 'choice',
+        ref: '1',
+        options: [{ label: 'Inbox' }, { label: 'Transcript', key: 'a' }],
+      },
+    ]
+    for (const label of ['Inbox', 'Transcript'])
+      expect(
+        answersNamedAtLineStart(
+          answerText([{ question: 'Where?', answer: label }], mixedKeys),
+          mixedKeys,
+        ),
+      ).toEqual({ 0: label })
+    expect(answersNamedAtLineStart('1b', mixedKeys)).toEqual({ 0: 'Inbox' })
   })
 
   it('drops fields that do not apply to a kind and trims what it keeps', () => {
