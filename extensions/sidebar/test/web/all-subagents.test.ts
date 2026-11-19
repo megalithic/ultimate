@@ -19,10 +19,11 @@ it('counts an in-flight group open unless folded, and only shown tree groups out
     [2, [{ id: 4 }]],
     [7, [{ id: 8 }]],
     [9, [{ id: 10 }]],
+    [10, [{ id: 11 }]],
   ])
   const roots = new Set([9])
   expect(anySubagentsOpen(children, [1], [1, 2, 7, 9], [], roots)).toBe(true)
-  expect(anySubagentsOpen(children, [1], [1, 2, 9], [1], roots)).toBe(false)
+  expect(anySubagentsOpen(children, [1], [1, 2, 9, 10], [1], roots)).toBe(false)
   expect(anySubagentsOpen(children, [1], [1, 2, 7, 9], [1], roots)).toBe(true)
   expect(anySubagentsOpen(children, [1], [], [], roots)).toBe(true)
 })

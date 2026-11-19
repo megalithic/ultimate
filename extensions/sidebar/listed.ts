@@ -27,15 +27,16 @@ export const anySubagentsOpen = (
   folded: readonly number[],
   roots: ReadonlySet<number>,
 ) => {
-  const flightTrees = new Set<number>()
+  const notTreeGroups = new Set<number>()
   const visit = (id: number) => {
-    flightTrees.add(id)
+    notTreeGroups.add(id)
     for (const child of childrenByParent.get(id) ?? []) visit(child.id)
   }
   flights.forEach(visit)
+  roots.forEach(visit)
   return (
     flights.some((id) => childrenByParent.has(id) && !folded.includes(id)) ||
-    expanded.some((id) => childrenByParent.has(id) && !flightTrees.has(id) && !roots.has(id))
+    expanded.some((id) => childrenByParent.has(id) && !notTreeGroups.has(id))
   )
 }
 
