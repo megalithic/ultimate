@@ -408,14 +408,19 @@ function TranscriptEntries() {
       for (const type of inputs) scroll.removeEventListener(type, release)
     }
   }, [scrollRef, contentRef])
-  const [reveal, setReveal] = useState<{ entry: EntryId; call?: string }>()
+  const [reveal, setReveal] = useState<{ entry: EntryId; call?: string; highlight?: boolean }>()
   useEvent('ultimate:reveal-entry', (value) => {
     const target = value as
-      | { conversationId?: ConversationId; entryId?: EntryId; toolCallId?: string }
+      | {
+          conversationId?: ConversationId
+          entryId?: EntryId
+          toolCallId?: string
+          highlight?: boolean
+        }
       | undefined
     const entryId = target?.entryId
     if (target?.conversationId === id && entryId !== undefined && Number.isSafeInteger(entryId))
-      setReveal({ entry: entryId, call: target?.toolCallId })
+      setReveal({ entry: entryId, call: target?.toolCallId, highlight: target?.highlight })
   })
   const openGroupsThenRevealOnNextCommit = useEffectEvent(() => {
     if (reveal === undefined || loading || pending) return
@@ -423,7 +428,7 @@ function TranscriptEntries() {
       setReveal(undefined)
       return
     }
-    const { entry: revealed, call } = reveal
+    const { entry: revealed, call, highlight } = reveal
     if (!entries.some((entry) => entry.id === revealed)) {
       if (cursor !== undefined && revealed < cursor) {
         void loadDown(revealed, stopScroll)
@@ -469,6 +474,14 @@ function TranscriptEntries() {
       revealedRowHeldBelowPinnedStrip.current = element
       maxPinnedCoverDuringHold.current = 0
       hold()
+      if (highlight) {
+        element.removeAttribute('data-revealed')
+        void (element as HTMLElement).offsetWidth
+        element.setAttribute('data-revealed', '')
+        element.addEventListener('animationend', () => element.removeAttribute('data-revealed'), {
+          once: true,
+        })
+      }
     }
     setReveal(undefined)
   })

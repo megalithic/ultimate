@@ -24,6 +24,8 @@ export type InboxItem = {
   title: string
   /** One line under the title. */
   gist?: string
+  /** The item's whole text, as Markdown: what a follow-up side chat is told about it. */
+  text?: string
   /** The reading pane's content, its buttons included. */
   pane: ReactNode
 }
@@ -37,9 +39,12 @@ export const InboxItems = definePoint<null, InboxItem[]>('inbox.items')
  * selected question, if any; undefined keeps the Inbox's own pane.
  */
 export const QuestionPane = definePoint<
-  { message: Message | undefined; phone: boolean },
+  { message: Message | undefined; item?: InboxItem; phone: boolean },
   ReactNode | undefined
 >('inbox.question-pane')
+
+/** Under a provided item's pane, for an item that belongs to a conversation: `side-chat` offers a follow-up there. */
+export const ItemFollowUp = definePoint<InboxItem, ReactNode>('inbox.item-follow-up')
 
 /** Renders with everything that waits on the user, oldest first: the open questions and every provided item. */
 export function Waiting({

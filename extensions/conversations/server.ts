@@ -27,6 +27,7 @@ import {
 import { summaryModel, summaryModelSetting, summaryModelStatus } from './summary-model.ts'
 import { parseSummaryModel } from './summary-model-ref.ts'
 import { implementAction } from '../../lib/actions.ts'
+import { isSideChat } from '../../lib/acting-as.ts'
 import type { ActionInput } from '../../lib/actions.ts'
 import { updateSettings, userSettingsPath } from '../../lib/settings.ts'
 import { Overview, overviewBehavior } from './overview.ts'
@@ -351,7 +352,8 @@ export default (host: ExtensionHost) => {
       // Pi upstream: @earendil-works/pi-durable@1.5.2 — patched transactional beforeInput hook. Drop when Pi ships input-placement hooks.
       hook(GenerationTask, {
         beforeInput: async (_input, api) => {
-          await resumeWithAncestorsIn(api.tx, [api.conversationId])
+          if (!(await isSideChat(host, api.tx, api.conversationId)))
+            await resumeWithAncestorsIn(api.tx, [api.conversationId])
           return identityNoteOncePerContextHead(api.tx, api.conversationId)
         },
         beforeRequest: (request, api) => {

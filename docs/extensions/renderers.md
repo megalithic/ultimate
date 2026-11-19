@@ -46,8 +46,9 @@ core }`; `core` starts as Streamdown's link, which asks "Open external link?" be
 renderers, link renderers compose in discovery order behind error boundaries that fall back to `core`: return `core`
 for links you leave alone. A link still streaming never reaches them. `instance` renders links to its previews as chips
 that open in the window. `MessageResponse` also turns `#id` and `#id/entry` mentions (three or more digits, outside
-code and links) into `#conversation-<id>[-<entry>]` links, and `MentionText` does the same for plain text;
-`conversations` renders those of known conversations as their feature chip, others stay text.
+code and links) into `#conversation-<id>[-<entry>]` links, and `message <id>` or `card <id>` into `#message-<id>` links;
+`MentionText` does the same for plain text. `conversations` renders those of known conversations as their feature chip,
+others stay text; `messages` renders message links that open and highlight the card.
 
 ```tsx
 link: ({ href, children, core }) =>

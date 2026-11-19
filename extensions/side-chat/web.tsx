@@ -51,7 +51,8 @@ import {
   MessageQuestions,
 } from '../questions/ui.tsx'
 import type { CardState, QuestionMessage } from '../questions/ui.tsx'
-import { QuestionPane } from '../inbox/ui.tsx'
+import { ItemFollowUp, QuestionPane } from '../inbox/ui.tsx'
+import type { InboxItem } from '../inbox/ui.tsx'
 import {
   contextSize,
   createEndings,
@@ -64,6 +65,7 @@ import {
 import {
   DiscardAction,
   InjectAction,
+  ItemSidesDoc,
   OpenAction,
   QuestionSidesDoc,
   SideChatDoc,
@@ -406,28 +408,33 @@ function SidePane({
     )
   const question = state?.question
   const asker = state?.of
+  const item = state?.item
+  const back = item !== undefined ? 'the item' : question === undefined ? 'main' : 'the question'
   return (
     <>
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border/60 px-3">
         <GitForkIcon className="size-3.5 text-brand" />
         <span className="text-[13px] font-semibold">Side chat</span>
         <span className="truncate font-mono text-[11px] text-muted-foreground">
-          {question === undefined
+          {question === undefined && item === undefined
             ? 'temporary copy of @ultimate'
             : `read-only copy of #${asker}${state?.tokens ? ` · ${contextSize(state.tokens)} context` : ''}`}
         </span>
         <button
-          aria-label={`Back to ${question === undefined ? 'main' : 'the question'}, keep the side chat`}
+          aria-label={`Back to ${back}, keep the side chat`}
           className="ml-auto flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
           onClick={onPark}
-          title={`Back to ${question === undefined ? 'main' : 'the question'} · keeps the side chat`}
+          title={`Back to ${back} · keeps the side chat`}
           type="button"
         >
           <MinimizeIcon className="size-3.5" />
         </button>
       </header>
       {openedAt !== undefined && (
-        <Cut at={openedAt} from={question === undefined ? '@ultimate' : `#${asker}`} />
+        <Cut
+          at={openedAt}
+          from={question === undefined && item === undefined ? '@ultimate' : `#${asker}`}
+        />
       )}
       {question !== undefined && (
         <PinnedQuestion
@@ -460,9 +467,11 @@ function SidePane({
               ? 'This side chat changed things · summarize to keep main informed'
               : phone
                 ? 'End it with'
-                : question === undefined
-                  ? 'Main keeps running · end it with'
-                  : `#${asker} waits for your answer · end it with`}
+                : item !== undefined
+                  ? 'Read-only · end it with'
+                  : question === undefined
+                    ? 'Main keeps running · end it with'
+                    : `#${asker} waits for your answer · end it with`}
           </span>
           {can.discard && (
             <Button
@@ -471,7 +480,7 @@ function SidePane({
               onClick={() => void end('discard')}
               size="sm"
               title={
-                question === undefined
+                question === undefined && item === undefined
                   ? 'Throw it away; main never hears of it'
                   : `Throw it away; #${asker} never hears of it`
               }
@@ -491,11 +500,13 @@ function SidePane({
             onClick={() => void end('inject')}
             size="sm"
             title={
-              question !== undefined
-                ? `Send #${asker} a summary without answering yet; answer on the card to send both`
-                : busy
-                  ? 'Stops the side chat, then sends main a summary'
-                  : 'Send main a summary it reads with its next input'
+              item !== undefined
+                ? `Send #${asker} a summary it reads with its next input, or @ultimate if #${asker} is concluded`
+                : question !== undefined
+                  ? `Send #${asker} a summary without answering yet; answer on the card to send both`
+                  : busy
+                    ? 'Stops the side chat, then sends main a summary'
+                    : 'Send main a summary it reads with its next input'
             }
             variant="outline"
           >
@@ -508,9 +519,11 @@ function SidePane({
               ? 'Summarizing…'
               : error
                 ? 'Retry summary'
-                : question === undefined
-                  ? 'Summarize & inject'
-                  : 'Summarize only'}
+                : item !== undefined
+                  ? 'Summarize & send'
+                  : question === undefined
+                    ? 'Summarize & inject'
+                    : 'Summarize only'}
           </Button>
         </div>
       </footer>
@@ -640,8 +653,11 @@ function useInboxSideChat({
   phone: boolean
 }): ReactNode | undefined {
   const sides = useDocOf(ROOT, QuestionSidesDoc)?.sides
+  const itemSides = useDocOf(ROOT, ItemSidesDoc)?.sides
   const [front, setFront] = useFront()
-  const side = sides?.find((item) => item.id === front && item.ended === undefined)
+  const side = [...(sides ?? []), ...(itemSides ?? [])].find(
+    (item) => item.id === front && item.ended === undefined,
+  )
   const index = useDocOf(side?.of, SideChatsDoc) ?? undefined
   if (!side) return undefined
   return (
@@ -654,6 +670,100 @@ function useInboxSideChat({
         <SidePane front index={index} onPark={() => setFront(null)} phone={phone} side={side.id} />
       </ConversationScope>
     </section>
+  )
+}
+
+function useAskAboutItem(item: InboxItem): ReactNode {
+  const sides = useDocOf(ROOT, ItemSidesDoc)?.sides
+  const [, setFront] = useFront()
+  const [text, setText] = useState('')
+  const [opening, setOpening] = useState(false)
+  const [error, setError] = useState('')
+  const conversation = item.conversation
+  if (conversation === undefined) return null
+  const open = sides?.find((side) => side.item === item.key && side.ended === undefined)
+  const ask = async () => {
+    if (!text.trim() || opening) return
+    setOpening(true)
+    setError('')
+    try {
+      const { id } = await api.action(OpenAction, {
+        item: {
+          key: item.key,
+          conversation,
+          title: item.title,
+          ...(item.text ? { text: item.text } : {}),
+        },
+        text,
+      })
+      setText('')
+      setFront(id)
+    } catch (failure) {
+      setError(errorMessage(failure).replace(/^side-chat\/\w+: /, ''))
+    } finally {
+      setOpening(false)
+    }
+  }
+  if (open)
+    return (
+      <Button
+        className="self-start text-muted-foreground"
+        data-item-side-chat={open.id}
+        onClick={() => setFront(open.id)}
+        size="sm"
+        variant="ghost"
+      >
+        <GitForkIcon className="text-brand" />
+        Back to the side chat
+      </Button>
+    )
+  return (
+    <div className="flex flex-col gap-1.5" data-ask-about-item={item.key}>
+      <div className="relative">
+        <textarea
+          aria-label="Ask about this item"
+          className="field-sizing-content max-h-40 min-h-9 w-full resize-none rounded-md border border-border/70 bg-background/40 px-2.5 py-2 pr-9 text-[13px] leading-snug transition-colors outline-none placeholder:text-muted-foreground/60 hover:border-border focus:border-brand/60 focus:bg-background disabled:opacity-60 max-md:min-h-11"
+          disabled={opening}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing) return
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault()
+              event.stopPropagation()
+              void ask()
+            } else if (event.key === 'Escape') {
+              event.preventDefault()
+              event.currentTarget.blur()
+            }
+          }}
+          placeholder={`Ask #${conversation} about this…`}
+          rows={1}
+          value={text}
+        />
+        <button
+          aria-label="Ask in a side chat"
+          className="absolute top-1.5 right-1.5 flex size-6 cursor-pointer items-center justify-center rounded text-muted-foreground hover:text-foreground disabled:cursor-default disabled:opacity-40"
+          disabled={!text.trim() || opening}
+          onClick={() => void ask()}
+          type="button"
+        >
+          {opening ? (
+            <LoaderCircleIcon className="size-3.5 motion-safe:animate-spin" />
+          ) : (
+            <GitForkIcon className="size-3.5 text-brand" />
+          )}
+        </button>
+      </div>
+      <p className="font-mono text-[11px] text-muted-foreground/70">
+        {error ? (
+          <span className="text-error" role="alert">
+            {error}
+          </span>
+        ) : (
+          `A read-only side chat forked from #${conversation} · it knows what led here`
+        )}
+      </p>
+    </div>
   )
 }
 
@@ -786,9 +896,15 @@ function useSideRows(main: ConversationId | undefined): ReactNode {
 function useSideIds(main: ConversationId | undefined): ReadonlySet<number> {
   const sides = (useDocOf(main, SideChatsDoc) ?? undefined)?.sides
   const questionSides = useDocOf(ROOT, QuestionSidesDoc)?.sides
+  const itemSides = useDocOf(ROOT, ItemSidesDoc)?.sides
   return useMemo(
-    () => new Set([...(sides ?? []), ...(questionSides ?? [])].map((side) => Number(side.id))),
-    [sides, questionSides],
+    () =>
+      new Set(
+        [...(sides ?? []), ...(questionSides ?? []), ...(itemSides ?? [])].map((side) =>
+          Number(side.id),
+        ),
+      ),
+    [sides, questionSides, itemSides],
   )
 }
 
@@ -801,6 +917,7 @@ export default defineWebExtension({
     provide(Unlisted, useSideIds),
     provide(CardActions, useTalkItThrough),
     provide(QuestionPane, useInboxSideChat),
+    provide(ItemFollowUp, useAskAboutItem),
     provide(EmptyTranscript, useQuestionSideStart),
   ],
 })

@@ -1,8 +1,11 @@
 import { parseConversationId, parseEntryId } from '../../../../lib/ids.ts'
 export const mentionPattern = /(?<![\w/#&])#(\d{3,})(?:\/(\d+))?(?![\w/])/g
+const globalMessageIdMention = /(?<![\w/#&-])(?:[Mm]essage|[Cc]ard) (\d+)(?![\w/]|\.\d)/g
+const anyMention = new RegExp(`${mentionPattern.source}|${globalMessageIdMention.source}`, 'g')
 
 export const mentionHref = (conversation: string, entry?: string) =>
   `#conversation-${conversation}${entry ? `-${entry}` : ''}`
+export const messageHref = (message: string) => `#message-${message}`
 
 export function parseMention(href: string) {
   const match = /^#conversation-(\d+)(?:-(\d+))?$/.exec(href)
@@ -14,12 +17,32 @@ export function parseMention(href: string) {
     : undefined
 }
 
+export function parseMessageMention(href: string) {
+  const match = /^#message-(\d+)$/.exec(href)
+  const id = match ? Number(match[1]) : NaN
+  return Number.isSafeInteger(id) ? id : undefined
+}
+
+type Mention = { text: string; href: string } & (
+  | { conversation: string; entry?: string }
+  | { message: string }
+)
+
 export function splitMentions(text: string) {
-  const parts: (string | { conversation: string; entry?: string; text: string })[] = []
+  const parts: (string | Mention)[] = []
   let last = 0
-  for (const match of text.matchAll(mentionPattern)) {
+  for (const match of text.matchAll(anyMention)) {
     if (match.index > last) parts.push(text.slice(last, match.index))
-    parts.push({ conversation: match[1], entry: match[2], text: match[0] })
+    parts.push(
+      match[3] === undefined
+        ? {
+            conversation: match[1],
+            entry: match[2],
+            text: match[0],
+            href: mentionHref(match[1], match[2]),
+          }
+        : { message: match[3], text: match[0], href: messageHref(match[3]) },
+    )
     last = match.index + match[0].length
   }
   if (last < text.length) parts.push(text.slice(last))
@@ -33,18 +56,14 @@ export function remarkMentions() {
     const preservesExistingLink = () => node.type === 'link' || node.type === 'linkReference'
     if (!node.children || preservesExistingLink()) return
     node.children = node.children.flatMap((child) => {
-      if (child.type !== 'text' || !child.value?.includes('#')) {
+      if (child.type !== 'text' || !child.value || !/#|message |card /i.test(child.value)) {
         visit(child)
         return [child]
       }
       return splitMentions(child.value).map((part) =>
         typeof part === 'string'
           ? { type: 'text', value: part }
-          : {
-              type: 'link',
-              url: mentionHref(part.conversation, part.entry),
-              children: [{ type: 'text', value: part.text }],
-            },
+          : { type: 'link', url: part.href, children: [{ type: 'text', value: part.text }] },
       )
     })
   }

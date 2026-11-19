@@ -4,6 +4,7 @@ import { expect, it, vi } from 'vitest'
 import {
   mentionHref,
   parseMention,
+  parseMessageMention,
   remarkMentions,
   splitMentions,
 } from '../../web/src/components/ai/mentions.ts'
@@ -93,4 +94,20 @@ it('renders a known mention as its chip and an unknown one as its text', () => {
     }),
   )
   expect(unknown).toBe('#999999')
+})
+
+it('links message and card ids in prose, which name a card by its global id alone', () => {
+  const parts = splitMentions('Answered message 706 and Card 12; see #157029/706.').filter(
+    (part) => typeof part !== 'string',
+  )
+  expect(parts.map((part) => [part.text, part.href])).toEqual([
+    ['message 706', '#message-706'],
+    ['Card 12', '#message-12'],
+    ['#157029/706', '#conversation-157029-706'],
+  ])
+  expect(parseMessageMention('#message-706')).toBe(706)
+  expect(parseMessageMention(mentionHref('706'))).toBeUndefined()
+  expect(mentions('a message, message-706, messages 7, card 1.5, postcard 3, message 7x')).toEqual(
+    [],
+  )
 })

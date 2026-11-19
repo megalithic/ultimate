@@ -142,7 +142,7 @@ function Pusher() {
       if (!Number.isSafeInteger(id) || id <= 0) return
       const message = Number(url.searchParams.get('message'))
       if (url.searchParams.has('message') && Number.isSafeInteger(message))
-        events.emit('messages:open', { conversation: id, message })
+        events.emit('messages:open', { message })
       showSurface('agent')
       switchConversation(id)
     }

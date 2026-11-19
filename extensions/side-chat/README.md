@@ -50,6 +50,14 @@ All three actions are user-only (`userActions`); agents cannot call them. Inputs
   - `QuestionSidesDoc` (`sidechat.questions`, on conversation 1) lists every question side chat, so a card or the Inbox finds its own with one subscription.
 - **Lineage:** lineage skips its catch-up note for any side chat, so a branch's copy is not flooded with the tally. Side chats stay out of the sidebar's lists through `Unlisted`.
 
+## Inbox item side chats
+
+- **Open:** an Inbox item that belongs to a conversation (inbox's `ItemFollowUp` point) shows an "Ask #id about this…" input under its pane. Enter calls `open {item: {key, conversation, title, text?}, text}`: it forks that conversation at its last finished turn, read-only, and submits the question; or returns the item's open side chat, so there is one per item. It forks concluded conversations too, without resuming them: a side chat's input never resumes its fork parent.
+- **Where it shows:** the Inbox's reading pane becomes the side chat (`QuestionPane`), as for questions; the input then reads "Back to the side chat".
+- **Read-only:** the same tools as a question side chat, minus `draft_answers`. The reminder carries the item's title and text.
+- **Ending:** Discard, or **Summarize & send**: a passive summary to the conversation, or to @ultimate when that conversation is concluded (the recipient is memoized in the ending task). Neither wakes it.
+- **Documents:** `SideChatDoc.item` holds the item; `ItemSidesDoc` (`sidechat.items`, on conversation 1) lists every item side chat; `SideChatSummary.item` names the item's key.
+
 ## Safety and attribution
 
 `effects` is sticky and committed **before** a potentially effectful tool executes. It deliberately locks Discard even if that call subsequently fails: a crash must not leave an effect behind while Discard is still permitted. Tracked: branch, message, note, notify, remember, setup, restart, edit, write; todo add/done; automation except list/runs/log. Bash and codemode themselves are not tracked (their nested tracked tools still are).

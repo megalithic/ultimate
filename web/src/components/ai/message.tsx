@@ -19,7 +19,7 @@ import {
   linkRenderers,
 } from '../../sdk/registry.ts'
 import { codePlugin } from './code-block.tsx'
-import { mentionHref, parseMention, remarkMentions, splitMentions } from './mentions.ts'
+import { parseMention, parseMessageMention, remarkMentions, splitMentions } from './mentions.ts'
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & { from: 'user' | 'assistant' }
 
@@ -50,7 +50,8 @@ const CoreLink = defaultComponents.a
 function Link(props: ComponentProps<'a'> & ExtraProps) {
   const renderers = linkRenderers(useExtensions())
   const { href, children } = props
-  const mentionWithoutRendererStaysText = href && parseMention(href)
+  const mentionWithoutRendererStaysText =
+    href && (parseMention(href) || parseMessageMention(href) !== undefined)
   const core = mentionWithoutRendererStaysText ? <>{children}</> : <CoreLink {...props} />
   const incompleteStreamingLink = !href || href === 'streamdown:incomplete-link'
   if (incompleteStreamingLink) return core
@@ -77,7 +78,7 @@ export function MentionText({ text }: { text: string }) {
     typeof part === 'string' ? (
       part
     ) : (
-      <Link href={mentionHref(part.conversation, part.entry)} key={index}>
+      <Link href={part.href} key={index}>
         {part.text}
       </Link>
     ),

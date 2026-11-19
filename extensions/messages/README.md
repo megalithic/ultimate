@@ -76,8 +76,14 @@ answer a `board.answered` note there; neither starts a run. A branch with an ope
 [Questions](../questions/README.md). While a sender has questions open, its next input is preceded by a `board.open`
 line listing them; @ultimate's lists every open question to the user and names `settle`.
 
-`/?conversation=<c>&message=<m>`, such as a notification's link, opens at that question while it is still open, as
-`messages:open {conversation, message}` does; otherwise it opens the conversation.
+Message ids are global, so an id alone finds its card. `/?message=<m>`, such as a notification's link, and
+`messages:open {message}` open the conversation that shows message `m`'s card (its sender's call, or else its input in
+the recipient), scroll to it and highlight it, answered or not; an unknown id shows a quiet "Message m not found"
+notice. `messages:open {conversation, entry | call}` reveals that entry or call without the highlight.
+
+`message 706` and `card 706` in agent text render as that link (`MessageResponse` and `MentionText`; the `link`
+renderer is `mention.tsx`). The messages prompt section tells agents to write `message <id>` when they point the user
+at a card.
 
 ## Ultimate and branches
 

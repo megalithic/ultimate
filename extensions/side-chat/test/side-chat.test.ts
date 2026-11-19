@@ -743,6 +743,65 @@ describe('side chats', () => {
     )
   })
 
+  it('follows up on an Inbox item read-only in a fork of its concluded conversation, and summarizes to @ultimate', async () => {
+    const f = await fixture()
+    const finished = (await entries(f.server, f.main)).at(-1)!.id
+    const added = await f.server.harness.commit(
+      (tx) => tx.forkConversation(f.main, finished, { ownership: { kind: 'ownerless' } }),
+      context,
+    )
+    await f.ask(added.id, 'ADDED THE ITEM')
+    await post(f.server, '/api/extensions/conversations/actions/conclude', {
+      args: { ids: [added.id] },
+    })
+    const item = {
+      key: 'inbox-items:7',
+      conversation: added.id,
+      title: 'Grant Accessibility',
+      text: 'Open System Settings',
+    }
+    const opened = await f.action('open', { item, text: 'WHY' }, ROOT_CONVERSATION_ID)
+    expect([opened.status, opened.data.error]).toEqual([200, undefined])
+    const side = opened.data.result.id as ConversationId
+    await (await f.server.harness.conversation(side, context))!.waitForIdle(context)
+    expect(await f.server.harness.snapshot(Side, side, context)).toMatchObject({
+      of: added.id,
+      item,
+      effects: false,
+    })
+    const own = JSON.stringify(await entries(f.server, side))
+    expect(own).toContain('follow up on an item in their Inbox')
+    expect(own).toContain('Grant Accessibility')
+    expect(own).toContain('echo WHY')
+    expect((await f.action('open', { item, text: 'AGAIN' })).data.result.id).toBe(side)
+
+    await f.call(side, 'note', { to: ROOT_CONVERSATION_ID, text: 'must not land' })
+    expect(JSON.stringify(await entries(f.server, side))).toContain(
+      'This side chat is read-only: note is blocked',
+    )
+
+    await writeFile(join(ultimateRoot, '.ultimate/settings.json'), JSON.stringify({}))
+    try {
+      const injected = await f.action('inject', { id: side })
+      expect([injected.status, injected.data.error]).toEqual([200, undefined])
+    } finally {
+      await writeFile(
+        join(ultimateRoot, '.ultimate/settings.json'),
+        JSON.stringify({ summaryModel: 'unavailable/test' }),
+      )
+    }
+    const summary = (await entries(f.server, f.main)).find(
+      (entry) => entry.kind === 'sidechat.summary',
+    )!
+    expect(summary.data).toMatchObject({ side, item: item.key, to: f.main })
+    expect(JSON.stringify(summary.model)).toContain(`from #${added.id}, which is concluded`)
+    expect(
+      (await entries(f.server, added.id)).some((entry) => entry.kind === 'sidechat.summary'),
+    ).toBe(false)
+    const next = (await f.action('open', { item, text: 'NEW' })).data.result.id
+    expect(next).not.toBe(side)
+  })
+
   it('drafts answers on the card without sending, only in a question side chat', async () => {
     const f = await fixture()
     await f.call(f.main, 'message', {

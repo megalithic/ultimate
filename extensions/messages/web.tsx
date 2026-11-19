@@ -1,4 +1,3 @@
-import { parseConversationId } from '../../lib/ids.ts'
 import type { EntryRecord, ConversationId } from '@earendil-works/pi-durable'
 import { ROOT } from '@/sdk'
 import { useEffect, useState } from 'react'
@@ -26,18 +25,19 @@ import {
 import {
   answeredMessages,
   emptyMessages,
-  openQuestion,
   scriptMessaged,
   threadRow,
   ultimateCompact,
 } from './data.tsx'
-import { callerOf } from './caller.ts'
+import { callerOf, cardOf } from './caller.ts'
+import { MessageMentionLink } from './mention.tsx'
 import { OpenMessages } from './open.tsx'
 import { QuestionPointer } from './pointer.tsx'
 import { OffscreenQuestions } from './waiting.tsx'
 import { StandingDoc } from '../subagents/ui.tsx'
 import { MessagesDoc, CallerAction } from './refs.ts'
 import type { MessagesData } from './refs.ts'
+import { store } from '@/sdk/client'
 
 function MessageAnswerLabel({ entry }: { entry: EntryRecord }) {
   const log = useDocOf(ROOT, MessagesDoc) ?? emptyMessages
@@ -57,52 +57,57 @@ function MessageAnswerLabel({ entry }: { entry: EntryRecord }) {
 
 function MessageNavigation() {
   const { id, entries, loading } = useConversation()
-  const { surface, showSurface } = useUltimate()
+  const { surface, showSurface, switchConversation } = useUltimate()
 
   const { ready } = useReady()
   const log = useDocOf(ROOT, MessagesDoc)
-  const [target, setTarget] = useState<{
-    conversation: ConversationId
-    entry?: number
-    call?: string
-    message?: number
-  }>()
+  const [target, setTarget] = useState<
+    | { message: number }
+    | { conversation: ConversationId; entry?: number; call?: string; highlight?: boolean }
+  >()
   useEvent('messages:open', (value) => setTarget(value as NonNullable<typeof target>))
 
   useEffect(() => {
     const url = new URL(location.href)
     const message = Number(url.searchParams.get('message'))
-    const conversation = parseConversationId(Number(url.searchParams.get('conversation')))
     if (!url.searchParams.has('message')) return
     url.searchParams.delete('message')
     history.replaceState(history.state, '', url)
-    if (Number.isSafeInteger(message) && Number.isSafeInteger(conversation) && conversation > 0)
-      setTarget({ conversation, message })
+    if (Number.isSafeInteger(message)) setTarget({ message })
   }, [])
 
   useEffect(() => {
-    if (target?.message === undefined || !log) return
-    const asked = log.messages.find((m) => m.id === target.message)
-    if (asked?.call && asked.from === target.conversation && openQuestion(asked)) {
-      showSurface('agent')
-      setTarget({ conversation: target.conversation, call: asked.call })
-    } else setTarget(undefined)
-  }, [target, log, showSurface])
+    if (!target || !('message' in target) || !log) return
+    const place = cardOf(log.messages.find((m) => m.id === target.message))
+    if (!place) {
+      store.notify({ level: 'info', message: `Message ${target.message} not found` })
+      setTarget(undefined)
+      return
+    }
+    showSurface('agent')
+    switchConversation(place.conversation)
+    setTarget({ ...place, highlight: true })
+  }, [target, log, showSurface, switchConversation])
   useEffect(() => {
     if (
       !target ||
-      target.message !== undefined ||
+      'message' in target ||
       !ready ||
       surface !== 'agent' ||
       id !== target.conversation ||
       loading
     )
       return undefined
-    const { call } = target
+    const { call, highlight } = target
 
     const toolCallId = call?.split('/')[0]
     const reveal = (entry: number) =>
-      events.emit('ultimate:reveal-entry', { conversationId: id, entryId: entry, toolCallId })
+      events.emit('ultimate:reveal-entry', {
+        conversationId: id,
+        entryId: entry,
+        toolCallId,
+        highlight,
+      })
     const loaded = target.entry ?? (toolCallId && callerOf(entries, toolCallId)?.id)
     if (loaded) {
       const revealAndClearTargetFrame = requestAnimationFrame(() => {
@@ -125,6 +130,7 @@ function MessageNavigation() {
 const afterPinnedPromptOrder = 1
 
 export default defineWebExtension({
+  link: MessageMentionLink,
   slots: {
     overlay: [MessageNavigation],
     'composer.status': [OpenMessages],

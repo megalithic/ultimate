@@ -31,7 +31,7 @@ export function questionsOf(
       key: `m${m.id}`,
       card: `[data-message-outgoing="${m.id}"]`,
       entry: m.call ? callerOf(entries, m.call.split('/')[0])?.id : undefined,
-      go: () => events.emit('messages:open', { conversation: id, message: m.id }),
+      go: () => events.emit('messages:open', { message: m.id }),
     }))
   const pointed = entries
     .filter((candidate) => AskedEntry.is(candidate))

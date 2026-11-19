@@ -11,7 +11,8 @@ export async function actingAs(
   const sidechatByKind = host.doc('sidechat')
   if (!sidechatByKind) return id
   const side = await host.harness().snapshot(sidechatByKind, id, context)
-  const readOnlyQuestionSideChatBorrowsNoIdentity = side?.question !== undefined
+  const readOnlyQuestionSideChatBorrowsNoIdentity =
+    side?.question !== undefined || side?.item !== undefined
   return typeof side?.of === 'number' && !readOnlyQuestionSideChatBorrowsNoIdentity
     ? parseConversationId(side.of)
     : id

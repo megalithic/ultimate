@@ -23,9 +23,11 @@ out behind its inline error card. Items are entries keyed by string; a question'
   lead or first line as its title, its first question as the gist, and how long it has waited, amber past an hour.
 - **Reading pane** for the selected item: the title, the rest of the text (messages' `Body`), its forwarded images
   (`MessageImages`), **Open preview** (a new tab) when it links one, **Open in branch #id** (messages'
-  `messages:open {conversation, message}`), and the answer card itself (questions' `MessageQuestions`). An extension
-  providing `QuestionPane` (`ui.tsx`) may take a question's pane over: side-chat shows the question's side chat there
-  while it is in front. When the shown
+  `messages:open {message}`), and the answer card itself (questions' `MessageQuestions`). An extension
+  providing `QuestionPane` (`ui.tsx`) may take the pane over: side-chat shows the question's or item's side chat there
+  while it is in front. A provided item with a `conversation` gets the `ItemFollowUp` point under its pane: side-chat
+  puts an "Ask #id about this…" input there, which opens a read-only side chat on that conversation (see side-chat's
+  README). When the shown
   item leaves, the one that took its place, the next oldest, shows.
 - **Keys** (desktop): `j`/`k` move the selection, `⇧O` opens the branch (plain `o` is the card's "Something else…"),
   and the card's own keys (1–9, letters, ↵, ⇧↵) answer the shown item: the Inbox passes `keys` to the card. A

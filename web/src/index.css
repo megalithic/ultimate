@@ -169,6 +169,26 @@
   }
 }
 
+/* A transcript row or card a link revealed: one brand ring that fades, so the eye lands on it. */
+[data-revealed] {
+  border-radius: var(--radius-lg);
+  animation: revealed 1.8s ease-out;
+}
+@keyframes revealed {
+  0%,
+  35% {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--brand) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-revealed] {
+    animation-duration: 2.4s;
+  }
+}
+
 /* A section or group heading in the chrome (panels, sidebar sections, picker groups): quiet sentence-case mono. */
 @utility section-label {
   @apply font-mono text-[11px] font-normal tracking-normal text-muted-foreground normal-case;

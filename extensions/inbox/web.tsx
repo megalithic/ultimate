@@ -33,7 +33,7 @@ import type { Message } from '../messages/refs.ts'
 import { MessageQuestions } from '../questions/ui.tsx'
 import { UnderUltimate } from '../sidebar/ui.tsx'
 import { talkToUltimate } from '../subagents/ui.tsx'
-import { QuestionPane } from './ui.tsx'
+import { ItemFollowUp, QuestionPane } from './ui.tsx'
 import { answeredToday, keyOf, lead, previewUrl, selection } from './items.tsx'
 import type { Entry } from './items.tsx'
 import { Waiting } from './ui.tsx'
@@ -202,7 +202,7 @@ function useOpenBranch() {
   return (entry: Entry) => {
     const conversation = conversationOf(entry)
     if (conversation === undefined) return
-    if (entry.message) events.emit('messages:open', { conversation, message: entry.message.id })
+    if (entry.message) events.emit('messages:open', { message: entry.message.id })
     showSurface('agent')
     switchConversation(conversation)
   }
@@ -281,7 +281,14 @@ function Reading({
       <MessageQuestions key={item.id} keys={!phone} message={item} />
     </div>
   ) : (
-    entry.item.pane
+    <>
+      {entry.item.pane}
+      {entry.item.conversation !== undefined && (
+        <AllProvided input={entry.item} point={ItemFollowUp}>
+          {(followUps) => followUps}
+        </AllProvided>
+      )}
+    </>
   )
   const id = item?.id ?? entry.key
   if (phone)
@@ -458,7 +465,7 @@ function Surface({ items, messages }: { items: Entry[]; messages: readonly Messa
     <Reading entry={item} key={item.key} now={now} onBack={() => setOpen(false)} phone={phone} />
   )
   return (
-    <Provided input={{ message: item?.message, phone }} point={QuestionPane}>
+    <Provided input={{ message: item?.message, item: item?.item, phone }} point={QuestionPane}>
       {(takeover) => (
         <div className="flex min-h-0 flex-1">
           <Sidebar />
