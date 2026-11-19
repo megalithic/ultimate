@@ -63,7 +63,13 @@ function MessageNavigation() {
   const log = useDocOf(ROOT, MessagesDoc)
   const [target, setTarget] = useState<
     | { message: number }
-    | { conversation: ConversationId; entry?: number; call?: string; highlight?: boolean }
+    | {
+        conversation: ConversationId
+        entry?: number
+        call?: string
+        card?: number
+        highlight?: boolean
+      }
   >()
   useEvent('messages:open', (value) => setTarget(value as NonNullable<typeof target>))
 
@@ -86,7 +92,7 @@ function MessageNavigation() {
     }
     showSurface('agent')
     switchConversation(place.conversation)
-    setTarget({ ...place, highlight: true })
+    setTarget({ ...place, card: target.message, highlight: true })
   }, [target, log, showSurface, switchConversation])
   useEffect(() => {
     if (
@@ -98,7 +104,7 @@ function MessageNavigation() {
       loading
     )
       return undefined
-    const { call, highlight } = target
+    const { call, card, highlight } = target
 
     const toolCallId = call?.split('/')[0]
     const reveal = (entry: number) =>
@@ -106,6 +112,7 @@ function MessageNavigation() {
         conversationId: id,
         entryId: entry,
         toolCallId,
+        selector: card === undefined ? undefined : `[data-message-outgoing="${card}"]`,
         highlight,
       })
     const loaded = target.entry ?? (toolCallId && callerOf(entries, toolCallId)?.id)

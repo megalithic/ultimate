@@ -408,19 +408,30 @@ function TranscriptEntries() {
       for (const type of inputs) scroll.removeEventListener(type, release)
     }
   }, [scrollRef, contentRef])
-  const [reveal, setReveal] = useState<{ entry: EntryId; call?: string; highlight?: boolean }>()
+  const [reveal, setReveal] = useState<{
+    entry: EntryId
+    call?: string
+    selector?: string
+    highlight?: boolean
+  }>()
   useEvent('ultimate:reveal-entry', (value) => {
     const target = value as
       | {
           conversationId?: ConversationId
           entryId?: EntryId
           toolCallId?: string
+          selector?: string
           highlight?: boolean
         }
       | undefined
     const entryId = target?.entryId
     if (target?.conversationId === id && entryId !== undefined && Number.isSafeInteger(entryId))
-      setReveal({ entry: entryId, call: target?.toolCallId, highlight: target?.highlight })
+      setReveal({
+        entry: entryId,
+        call: target?.toolCallId,
+        selector: target?.selector,
+        highlight: target?.highlight,
+      })
   })
   const openGroupsThenRevealOnNextCommit = useEffectEvent(() => {
     if (reveal === undefined || loading || pending) return
@@ -428,7 +439,7 @@ function TranscriptEntries() {
       setReveal(undefined)
       return
     }
-    const { entry: revealed, call, highlight } = reveal
+    const { entry: revealed, call, selector, highlight } = reveal
     if (!entries.some((entry) => entry.id === revealed)) {
       if (cursor !== undefined && revealed < cursor) {
         void loadDown(revealed, stopScroll)
@@ -461,14 +472,20 @@ function TranscriptEntries() {
       return
     }
     const row = `[data-entry-id="${revealed}"]`
-    const block =
-      call === undefined
-        ? undefined
-        : contentRef.current?.querySelector(`${row} [data-tool-call-id="${CSS.escape(call)}"]`)
+    const shown = (found: Element | null | undefined) =>
+      found && found.getBoundingClientRect().height > 0 ? found : undefined
     const element =
-      block && block.getBoundingClientRect().height > 0
-        ? block
-        : contentRef.current?.querySelector(row)
+      shown(
+        selector === undefined
+          ? undefined
+          : contentRef.current?.querySelector(`${row} ${selector}`),
+      ) ??
+      shown(
+        call === undefined
+          ? undefined
+          : contentRef.current?.querySelector(`${row} [data-tool-call-id="${CSS.escape(call)}"]`),
+      ) ??
+      contentRef.current?.querySelector(row)
     if (element) {
       stopScroll()
       revealedRowHeldBelowPinnedStrip.current = element

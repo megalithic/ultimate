@@ -110,4 +110,13 @@ it('links message and card ids in prose, which name a card by its global id alon
   expect(mentions('a message, message-706, messages 7, card 1.5, postcard 3, message 7x')).toEqual(
     [],
   )
+  expect(
+    mentions(
+      'the message 5 seconds ago; insert the card 2 inches in; card 3 of 5; message 2 more times',
+    ),
+  ).toEqual([])
+  expect(mentions('see message 706 for details, then card 12 is done')).toEqual([
+    'message 706',
+    'card 12',
+  ])
 })

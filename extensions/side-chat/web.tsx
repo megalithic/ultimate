@@ -814,7 +814,8 @@ function Cut({ at, from }: { at: number; from: string }) {
 const SummaryCard = renderEntry(SideChatSummaryEntry, function SummaryCard({ entry }) {
   const data = entry.data
   const { switchConversation } = useUltimate()
-  const index = useDocOf(data.to, SideChatsDoc)
+  const of = useDocOf(data.side, SideChatDoc)?.of ?? data.to
+  const index = useDocOf(of, SideChatsDoc)
   const openedAt = index?.sides.find((item) => item.id === data.side)?.openedAt
   const at = entry.model?.[0]?.timestamp
   return (

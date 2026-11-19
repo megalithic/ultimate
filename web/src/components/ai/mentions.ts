@@ -1,6 +1,11 @@
 import { parseConversationId, parseEntryId } from '../../../../lib/ids.ts'
 export const mentionPattern = /(?<![\w/#&])#(\d{3,})(?:\/(\d+))?(?![\w/])/g
-const globalMessageIdMention = /(?<![\w/#&-])(?:[Mm]essage|[Cc]ard) (\d+)(?![\w/]|\.\d)/g
+const quantity =
+  ' ?(?:%|percent|times|more|of|ms|s|secs?|seconds?|mins?|minutes?|h|hrs?|hours?|days?|weeks?|months?|years?|px|mm|cm|m|inch(?:es)?|ft|feet)\\b'
+const globalMessageIdMention = new RegExp(
+  `(?<![\\w/#&-])(?:[Mm]essage|[Cc]ard) (\\d+)(?![\\w/]|\\.\\d|${quantity})`,
+  'g',
+)
 const anyMention = new RegExp(`${mentionPattern.source}|${globalMessageIdMention.source}`, 'g')
 
 export const mentionHref = (conversation: string, entry?: string) =>
