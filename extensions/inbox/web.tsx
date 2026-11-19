@@ -285,7 +285,13 @@ function Reading({
       {entry.item.pane}
       {entry.item.conversation !== undefined && (
         <AllProvided input={entry.item} point={ItemFollowUp}>
-          {(followUps) => followUps}
+          {(followUps) =>
+            followUps.some(Boolean) && (
+              <div className="mt-8 flex flex-col gap-2 border-t border-border/60 pt-5">
+                {followUps}
+              </div>
+            )
+          }
         </AllProvided>
       )}
     </>
