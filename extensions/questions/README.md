@@ -47,7 +47,8 @@ open at a time, its text rendered as Markdown (code blocks highlighted, with cop
 first line with their answer (`1b drop them`) or “not answered”, and a dot per question shows progress. Kinds: `choice` (one option), `multi` (any), `confirm` (Yes/No), `scale` (numbered steps with end
 labels) and `text` (a field); options offer “Something else…” with an inline field, and an option's Markdown `preview`
 shows beside the options for the hovered or chosen one. Recommended options (@ultimate's picks, also on a branch's card) carry a “my pick” chip and
-come already chosen: the card opens with them in its draft, on the first question without a pick. Under the questions,
+a brand-tinted border but start unchosen: nothing counts as answered until the user chooses, and the preview shows the
+pick until then. ⇧↵ accepts the picks: it chooses them on every open question still unanswered and sends at once. Under the questions,
 a note field is always there: whatever it holds goes after the answer lines, or on its own (“Send note”), and never
 changes a pick. Send sends what is answered (“Send 2 of 5”). Sending locks the card as it is and turns Send into
 **Undo**, which fills over a 3 s window before the answer goes out; Undo keeps the picks and the note. Holding Send for

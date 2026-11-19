@@ -1,7 +1,7 @@
 // Answers a three-question card in a real browser with only the keyboard: letter keys choose, ↑/↓ move between
 // questions, Enter sends; the reply reaches @ultimate in the message's own numbering, with the note field's text after it.
-// The card opens with the picks chosen; Send turns into Undo over the undo window, holding Send for a second sends at
-// once, and leaving the page inside the undo window still sends the answer.
+// The card opens with the picks marked but unchosen; ⇧↵ accepts them. Send turns into Undo over the undo window, holding
+// Send for a second sends at once, and leaving the page inside the undo window still sends the answer.
 import { join, resolve } from 'node:path'
 import { fauxAssistantMessage, fauxToolCall } from '@earendil-works/pi-ai/providers/faux'
 import type { FauxResponseFactory } from '@earendil-works/pi-ai/providers/faux'
@@ -105,8 +105,9 @@ it('answers a decisions card with letters, arrows and Enter', async () => {
   const { conversation, log, ask, asked, page, card } = await openCard()
   // The composer takes focus on desktop and keeps its keys; the card takes them once the user leaves it.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  // The picks are already chosen. Question 1: b; down to 2: a; down to 3: b; back up twice and change 1 to c.
-  expect(await card.locator('[aria-pressed=true]').count()).toBe(3)
+  // Nothing starts chosen and Send waits. Question 1: b; down to 2: a; down to 3: b; back up twice and change 1 to c.
+  expect(await card.locator('[aria-pressed=true]').count()).toBe(0)
+  expect(await card.getByRole('button', { name: 'Send 0 of 3' }).isDisabled()).toBe(true)
   await page.keyboard.press('ArrowUp')
   await page.keyboard.press('ArrowUp')
   await page.keyboard.press('b')
@@ -159,12 +160,14 @@ it('answers a decisions card with letters, arrows and Enter', async () => {
   // then answers "Noted." instead of asking again.
   await until(async () => (await answer())!.state === 'answered')
 
-  // A fresh card opens with the picks chosen: holding Send for a second sends at once, with no undo window.
+  // On a fresh card, holding Send for a second sends at once, with no undo window.
   await (await conversation.submit({ type: 'input', content: 'ask' }, context)).wait(context)
   await until(async () => (await ask())!.id !== asked.id)
   const second = (await ask())!
   const next = page.locator(`[data-questions-card="message:${second.id}"]`)
   await next.locator('fieldset').nth(2).waitFor()
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  for (const key of ['a', 'ArrowDown', 'a', 'ArrowDown', 'a']) await page.keyboard.press(key)
   const send = next.getByRole('button', { name: 'Send', exact: true })
   const box = (await send.boundingBox())!
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
@@ -188,13 +191,27 @@ it('answers a decisions card with letters, arrows and Enter', async () => {
   expect((await picked())!.text).toMatch(/^1a\. .+\n\n2a\. .+\n\n3a\. Land it: yes$/)
 })
 
+it('accepts the picks with ⇧↵ on the questions still unanswered, at once', async () => {
+  const { log, asked, page } = await openCard()
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('b')
+  await page.keyboard.press('Shift+Enter')
+  const answer = async () =>
+    (await log())?.messages.find((m) => m.re === asked.id && m.from === 'user')
+  await until(async () => !!(await answer()))
+  expect((await answer())!.text).toMatch(/^1a\. .+\n\n2b\. .+: leave it\n\n3a\. Land it: yes$/)
+})
+
 it('sends a held answer when the page is left inside the undo window', async () => {
   const { log, asked, page, card } = await openCard()
-  await card.getByRole('button', { name: 'Send', exact: true }).click()
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await page.keyboard.press('a')
+  await card.getByRole('button', { name: 'Send 1 of 3' }).click()
   await card.getByRole('button', { name: 'Undo' }).waitFor()
   await page.goto('about:blank')
   const answer = async () =>
     (await log())?.messages.find((m) => m.re === asked.id && m.from === 'user')
   await until(async () => !!(await answer()))
-  expect((await answer())!.text).toMatch(/^1a\. .+\n\n2a\. .+\n\n3a\. Land it: yes$/)
+  expect((await answer())!.text).toMatch(/^1a\. Branch starts in the context: .+$/)
 })

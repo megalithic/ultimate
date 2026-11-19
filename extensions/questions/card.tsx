@@ -38,6 +38,7 @@ import {
   choiceForKey,
   choices,
   keyOf,
+  pickDraft,
   sentDraft,
 } from './state.tsx'
 import type { CardState, Draft } from './state.tsx'
@@ -195,7 +196,7 @@ function SendButton({
       title={
         pending
           ? 'Take your answer back; your picks and note stay'
-          : 'Click to send with a moment to undo; hold (or ⇧↵) to send at once'
+          : 'Click to send with a moment to undo; hold to send at once'
       }
       onPointerDown={(event) => {
         const interrupting = interruption.current === event.nativeEvent
@@ -469,16 +470,29 @@ function Card({
     }
   }
   const send = (immediately = false) => {
+    sendDrafts(unsent, immediately)
+  }
+  const acceptPicks = () => {
+    const picked = { ...unsent }
+    for (const index of openAt) {
+      const pick = words[index] ? undefined : pickDraft(questions[index])
+      if (pick) picked[index] = pick
+    }
+    setState((old) => ({ ...old, drafts: { ...old.drafts, ...picked } }))
+    sendDrafts(picked, true)
+  }
+  const sendDrafts = (open: Record<number, Draft>, immediately: boolean) => {
     const extra = note.trim()
-    if ((!ready.length && !extra) || committed.current) return
+    const answers = answered(questions, open)
+    if ((!answers.length && !extra) || committed.current) return
     committed.current = true
     cancelAdvanceAfterCheck.current?.()
-    setLockedIn({ drafts, note })
+    setLockedIn({ drafts: { ...open, ...sent }, note })
     const fire = (keepalive = false) => {
       undoWindowSend.current = undefined
       setPhase('sending')
       setError(undefined)
-      submit(ready, extra || undefined, keepalive).then(
+      submit(answers, extra || undefined, keepalive).then(
         (sentMessage) => {
           setPhase('sent')
           setState((old) => ({ ...old, note: '' }))
@@ -533,7 +547,7 @@ function Card({
     if (event.key === 'Enter') {
       event.preventDefault()
       event.stopPropagation()
-      if (event.shiftKey) send(true)
+      if (event.shiftKey) acceptPicks()
       else enter()
     } else if (event.key === 'Escape') {
       event.preventDefault()
@@ -585,7 +599,7 @@ function Card({
         move(event.key === 'ArrowDown' ? 1 : -1)
       } else if (event.key === 'Enter') {
         event.preventDefault()
-        if (event.shiftKey) send(true)
+        if (event.shiftKey) acceptPicks()
         else enter()
       } else if (event.key === 'Escape' && words[current] && !(current in sent)) {
         event.preventDefault()
@@ -644,6 +658,7 @@ function Card({
   const shownKeys = shown ? [0, 1].flatMap((i) => keyOf(shown, i) ?? []) : []
   const sentCount = questions.length - openAt.length
   const unanswered = openAt.length - ready.length
+  const picksLeft = openAt.some((index) => !words[index] && pickDraft(questions[index]))
   return (
     <div className={className} data-questions-card={card} ref={root}>
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 font-mono text-[11px] text-muted-foreground">
@@ -724,6 +739,11 @@ function Card({
                 <Key>esc</Key> clear
               </span>
             )}
+            {picksLeft && (
+              <span className="flex items-center gap-1">
+                <Key>⇧↵</Key> accept picks
+              </span>
+            )}
           </span>
         )}
         <span className="ml-auto flex items-center gap-1.5">
@@ -748,7 +768,7 @@ function Card({
             {sendLabel ??
               (!ready.length && note.trim()
                 ? 'Send note'
-                : unanswered && ready.length
+                : unanswered && openAt.length > 1
                   ? `Send ${ready.length} of ${openAt.length}`
                   : 'Send')}
           </SendButton>
