@@ -60,7 +60,8 @@ advance in steps. Dismiss closes the message without an answer. Beside it, the `
 `data-receded` (a transcript behind a side chat's sheet) takes no keys. A message without questions gets a one-line answer
 field (sent as a Reply to that message) and Dismiss. On desktop, 1–9 or an option's letter (`y`/`n` for Yes/No, `o`
 for Something else) chooses, ↑/↓ moves between questions, Enter goes to the next question while one is unanswered,
-and sends from the last one or once all are answered; ⇧Enter sends at once, like a held Send; `/` focuses the note field, where Enter sends and
+and sends from the last one or once all are answered; ⇧Enter accepts the picks: it chooses them on the open questions still unanswered and sends at once, with no undo
+window (a held Send also skips the window but sends only what is chosen); `/` focuses the note field, where Enter sends and
 ⇧Enter breaks a line; Esc clears an answer, leaves the note field or, while Undo fills, undoes (so does `u`; Enter sends at once). Only the shown
 conversation's newest open card takes these keys; they leave alone input/textarea editing and keys pressed in another
 card, on another control or in the panel, whose cards take no global keys.

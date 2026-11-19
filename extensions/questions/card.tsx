@@ -768,7 +768,7 @@ function Card({
             {sendLabel ??
               (!ready.length && note.trim()
                 ? 'Send note'
-                : unanswered && openAt.length > 1
+                : unanswered
                   ? `Send ${ready.length} of ${openAt.length}`
                   : 'Send')}
           </SendButton>
