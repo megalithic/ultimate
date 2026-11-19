@@ -535,9 +535,11 @@ function Tree({
   const anyFlightOpen = anySubagentsOpen(
     childrenByParent,
     openBranches.map((branch) => branch.id),
+    topLevel
+      .filter((top) => !roots.has(top.id) && !openBranches.includes(top))
+      .map((top) => top.id),
     expanded,
     folded,
-    roots,
   )
   const toggleFlights =
     flightParents.length > 0 ? (

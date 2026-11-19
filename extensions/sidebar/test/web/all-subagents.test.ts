@@ -20,12 +20,13 @@ it('counts an in-flight group open unless folded, and only shown tree groups out
     [7, [{ id: 8 }]],
     [9, [{ id: 10 }]],
     [10, [{ id: 11 }]],
+    [82, [{ id: 83 }]],
   ])
-  const roots = new Set([9])
-  expect(anySubagentsOpen(children, [1], [1, 2, 7, 9], [], roots)).toBe(true)
-  expect(anySubagentsOpen(children, [1], [1, 2, 9, 10], [1], roots)).toBe(false)
-  expect(anySubagentsOpen(children, [1], [1, 2, 7, 9], [1], roots)).toBe(true)
-  expect(anySubagentsOpen(children, [1], [], [], roots)).toBe(true)
+  const treeTops = [7]
+  expect(anySubagentsOpen(children, [1], treeTops, [1, 2, 7, 9], [])).toBe(true)
+  expect(anySubagentsOpen(children, [1], treeTops, [1, 2, 9, 10, 82], [1])).toBe(false)
+  expect(anySubagentsOpen(children, [1], treeTops, [1, 2, 7, 9], [1])).toBe(true)
+  expect(anySubagentsOpen(children, [1], treeTops, [], [])).toBe(true)
 })
 
 it('expands every group, or folds every in-flight group and closes every tree group', () => {
