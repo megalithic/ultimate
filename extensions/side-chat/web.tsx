@@ -1,6 +1,7 @@
 import type { ConversationId } from '@earendil-works/pi-durable'
 import { ROOT, renderEntry } from '@/sdk'
 import { deadline } from '../../lib/timers.ts'
+import { settled } from '../../lib/errors.ts'
 import {
   ArrowLeftIcon,
   ChevronDownIcon,
@@ -20,8 +21,10 @@ import { Kbd } from '@/components/ui/kbd'
 import {
   api,
   Card,
+  clearComposer,
   cn,
   column,
+  composerDraft,
   ComposerRedirect,
   Conversation,
   ConversationScope,
@@ -402,9 +405,48 @@ function SidePane({
   useEffect(() => {
     if (front) document.getElementById(`composer-input-${side}`)?.focus()
   }, [front, side])
+  const [guard, setGuard] = useState<DraftGuard>()
+  const settle = (choice: 'keep' | 'include' | 'without') => {
+    setGuard(undefined)
+    guard?.settle(choice)
+  }
+  const guarded = (how: 'discard' | 'inject', go: (draft?: string) => Promise<unknown>) => {
+    const draft = composerDraft(side)
+    if (!draft) return go()
+    guard?.settle('keep')
+    return new Promise<unknown>((resolve, reject) =>
+      setGuard({
+        how,
+        attachments: draft.images + draft.files,
+        text: draft.text.trim() !== '',
+        settle: (choice) => {
+          if (choice === 'keep')
+            return reject(new Error('Nothing was sent: your draft is still there'))
+          go(choice === 'include' ? draft.text : undefined).then(resolve, reject)
+        },
+      }),
+    )
+  }
+  const injectWith = async (
+    draft: string | undefined,
+    args: { answer?: Reply },
+    keepalive = false,
+  ) => {
+    const result = await api.action(
+      InjectAction,
+      { id: side, ...args, ...(draft ? { draft } : {}) },
+      { keepalive },
+    )
+    if (draft) clearComposer(side)
+    return result
+  }
   const end = (how: 'discard' | 'inject') =>
-    sideEndings.end(side, how, () =>
-      api.action(how === 'inject' ? InjectAction : DiscardAction, { id: side }),
+    settled(
+      guarded(how, (draft) =>
+        sideEndings.end(side, how, () =>
+          how === 'inject' ? injectWith(draft, {}) : api.action(DiscardAction, { id: side }),
+        ),
+      ),
     )
   const question = state?.question
   const asker = state?.of
@@ -439,13 +481,13 @@ function SidePane({
       {question !== undefined && (
         <PinnedQuestion
           answerWith={(answer, keepalive) =>
-            api
-              .action(InjectAction, { id: side, answer }, { keepalive })
-              .catch((failure: unknown) => {
+            guarded('inject', (draft) =>
+              injectWith(draft, { answer }, keepalive).catch((failure: unknown) => {
                 throw new Error(
                   `Nothing was sent: ${errorMessage(failure).replace(/^side-chat\/\w+: /, '')}`,
                 )
-              })
+              }),
+            )
           }
           keys={front && !phone}
           message={question}
@@ -461,73 +503,131 @@ function SidePane({
             {error}
           </p>
         )}
-        <div className="flex items-center gap-2">
-          <span className="mr-auto min-w-0 truncate font-mono text-[11px] text-muted-foreground">
-            {can.locked
-              ? 'This side chat changed things · summarize to keep main informed'
-              : phone
-                ? 'End it with'
-                : item !== undefined
-                  ? 'Read-only · end it with'
-                  : question === undefined
-                    ? 'Main keeps running · end it with'
-                    : `#${asker} waits for your answer · end it with`}
-          </span>
-          {can.discard && (
+        {guard ? (
+          <DraftGuardRow guard={guard} phone={phone} settle={settle} />
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="mr-auto min-w-0 truncate font-mono text-[11px] text-muted-foreground">
+              {can.locked
+                ? 'This side chat changed things · summarize to keep main informed'
+                : phone
+                  ? 'End it with'
+                  : item !== undefined
+                    ? 'Read-only · end it with'
+                    : question === undefined
+                      ? 'Main keeps running · end it with'
+                      : `#${asker} waits for your answer · end it with`}
+            </span>
+            {can.discard && (
+              <Button
+                className="text-muted-foreground"
+                disabled={ending !== undefined}
+                onClick={() => void end('discard')}
+                size="sm"
+                title={
+                  question === undefined && item === undefined
+                    ? 'Throw it away; main never hears of it'
+                    : `Throw it away; #${asker} never hears of it`
+                }
+                variant="ghost"
+              >
+                {ending === 'discard' ? (
+                  <LoaderCircleIcon className="motion-safe:animate-spin" />
+                ) : (
+                  <Trash2Icon />
+                )}
+                Discard
+              </Button>
+            )}
             <Button
-              className="text-muted-foreground"
-              disabled={ending !== undefined}
-              onClick={() => void end('discard')}
+              className="border-brand/50 text-foreground hover:border-brand"
+              disabled={!can.inject || ending !== undefined}
+              onClick={() => void end('inject')}
               size="sm"
               title={
-                question === undefined && item === undefined
-                  ? 'Throw it away; main never hears of it'
-                  : `Throw it away; #${asker} never hears of it`
+                item !== undefined
+                  ? `Send #${asker} a summary it reads with its next input, or @ultimate if #${asker} is concluded`
+                  : question !== undefined
+                    ? `Send #${asker} a summary without answering yet; answer on the card to send both`
+                    : busy
+                      ? 'Stops the side chat, then sends main a summary'
+                      : 'Send main a summary it reads with its next input'
               }
-              variant="ghost"
+              variant="outline"
             >
-              {ending === 'discard' ? (
-                <LoaderCircleIcon className="motion-safe:animate-spin" />
+              {ending === 'inject' ? (
+                <LoaderCircleIcon className="text-brand motion-safe:animate-spin" />
               ) : (
-                <Trash2Icon />
+                <SparklesIcon className="text-brand" />
               )}
-              Discard
+              {ending === 'inject'
+                ? 'Summarizing…'
+                : error
+                  ? 'Retry summary'
+                  : item !== undefined
+                    ? 'Summarize & send'
+                    : question === undefined
+                      ? 'Summarize & inject'
+                      : 'Summarize only'}
             </Button>
-          )}
-          <Button
-            className="border-brand/50 text-foreground hover:border-brand"
-            disabled={!can.inject || ending !== undefined}
-            onClick={() => void end('inject')}
-            size="sm"
-            title={
-              item !== undefined
-                ? `Send #${asker} a summary it reads with its next input, or @ultimate if #${asker} is concluded`
-                : question !== undefined
-                  ? `Send #${asker} a summary without answering yet; answer on the card to send both`
-                  : busy
-                    ? 'Stops the side chat, then sends main a summary'
-                    : 'Send main a summary it reads with its next input'
-            }
-            variant="outline"
-          >
-            {ending === 'inject' ? (
-              <LoaderCircleIcon className="text-brand motion-safe:animate-spin" />
-            ) : (
-              <SparklesIcon className="text-brand" />
-            )}
-            {ending === 'inject'
-              ? 'Summarizing…'
-              : error
-                ? 'Retry summary'
-                : item !== undefined
-                  ? 'Summarize & send'
-                  : question === undefined
-                    ? 'Summarize & inject'
-                    : 'Summarize only'}
-          </Button>
-        </div>
+          </div>
+        )}
       </footer>
     </>
+  )
+}
+
+type DraftGuard = {
+  how: 'discard' | 'inject'
+  text: boolean
+  attachments: number
+  settle: (choice: 'keep' | 'include' | 'without') => void
+}
+
+function DraftGuardRow({
+  guard,
+  phone,
+  settle,
+}: {
+  guard: DraftGuard
+  phone: boolean
+  settle: (choice: 'keep' | 'include' | 'without') => void
+}) {
+  const inject = guard.how === 'inject'
+  return (
+    <div className="flex items-center gap-2" data-draft-guard role="alert">
+      <span className="mr-auto min-w-0 truncate font-mono text-[11px] text-warning">
+        {phone
+          ? 'Unsent draft'
+          : inject
+            ? `Your composer holds an unsent draft${guard.attachments ? ' · attachments stay out' : ''}`
+            : 'Your composer holds an unsent draft · discarding leaves it out'}
+      </span>
+      <Button autoFocus onClick={() => settle('keep')} size="sm" variant="ghost">
+        Keep editing
+      </Button>
+      {inject && guard.text && (
+        <Button
+          className="border-brand/50 text-foreground hover:border-brand"
+          onClick={() => settle('include')}
+          size="sm"
+          title="Quote the draft word for word under the summary"
+          variant="outline"
+        >
+          <SparklesIcon className="text-brand" />
+          Include draft
+        </Button>
+      )}
+      <Button
+        className="text-muted-foreground"
+        onClick={() => settle('without')}
+        size="sm"
+        title={inject ? 'Summarize without the draft; it stays in this composer' : undefined}
+        variant="ghost"
+      >
+        {inject ? 'Without it' : 'Discard anyway'}
+      </Button>
+    </div>
   )
 }
 
@@ -554,7 +654,7 @@ function PinnedQuestion({
   const ready = answered(questions, unsent).length
   const openCount = questions.length - Object.keys(sent).length
   const waits = message.state === 'delivered'
-  const settled =
+  const outcome =
     message.state === 'dismissed'
       ? 'dismissed · the asker knows'
       : 'answered · the asker has your answer'
@@ -573,7 +673,7 @@ function PinnedQuestion({
       >
         <MessageCircleQuestionIcon className="size-3.5 shrink-0 text-brand" />
         <span className="min-w-0 flex-1 truncate">
-          {waits ? lead.replace(/\*\*/g, '') : settled}
+          {waits ? lead.replace(/\*\*/g, '') : outcome}
         </span>
         {waits && folded && (
           <span className="shrink-0 text-brand">

@@ -174,6 +174,7 @@ async function end(
   mode: 'discarded' | 'injected',
   answer?: Reply,
   device?: Device,
+  draft?: string,
 ) {
   const summaries = host.need(ConversationsApi)
   if (answer !== undefined) checkReply(answer)
@@ -233,6 +234,7 @@ async function end(
       {
         side: id,
         ...(model ? { model } : {}),
+        ...(draft ? { draft } : {}),
         ...(reply ? { reply: { ...reply, ...(device ? { device } : {}) } } : {}),
       },
       {
@@ -280,6 +282,7 @@ export function endTask(host: ExtensionHost) {
     {
       side: ConversationId
       model?: SummaryModel
+      draft?: string
       reply?: { message: number; text: string; device?: Device; given?: AnswersByQuestionIndex }
     },
     { phase: 'stop' } | { phase: 'summarize' },
@@ -366,7 +369,10 @@ export function endTask(host: ExtensionHost) {
             }, ctx)
             return
           }
-          const text = response.text.trim()
+          const draft = task.input.draft?.trim()
+          const text = draft
+            ? `${response.text.trim()}\n\nThe user's unsent draft, word for word:\n\n${draft.replace(/^/gm, '> ')}`
+            : response.text.trim()
           const at = await host.harness().commit((tx) => tx.entry(side.at!), ctx)
           const time = new Date(at!.model![0].timestamp).toISOString().slice(11, 16)
           const to =
@@ -734,7 +740,9 @@ export const actions = {
     const answer = args && typeof args === 'object' && 'answer' in args ? args.answer : undefined
     if (answer !== undefined && (answer === null || typeof answer !== 'object'))
       throw new Error('answer must be {answers?, note?} or {text}')
-    return end(host, sideId(args), 'injected', answer, device)
+    const draft = args && typeof args === 'object' && 'draft' in args ? args.draft : undefined
+    if (draft !== undefined && typeof draft !== 'string') throw new Error('draft must be a string')
+    return end(host, sideId(args), 'injected', answer, device, draft)
   }),
 }
 

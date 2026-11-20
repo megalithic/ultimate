@@ -248,6 +248,19 @@ export function fillComposer(id: number, text: string) {
   if (draft.key) localStorage.setItem(draft.key, text)
 }
 
+export function composerDraft(id: number) {
+  const { text, images, files } = getDraft(id).get()
+  return text.trim() || images.length || files.length
+    ? { text, images: images.length, files: files.length }
+    : undefined
+}
+
+export function clearComposer(id: number) {
+  const draft = getDraft(id)
+  draft.set({ text: '', images: [], files: [], revision: draft.get().revision + 1 })
+  if (draft.key) localStorage.removeItem(draft.key)
+}
+
 export function insertIntoComposer(id: number, text: string) {
   const draft = getDraft(id)
   const current = draft.get().text

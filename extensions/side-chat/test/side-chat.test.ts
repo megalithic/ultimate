@@ -782,7 +782,10 @@ describe('side chats', () => {
 
     await writeFile(join(ultimateRoot, '.ultimate/settings.json'), JSON.stringify({}))
     try {
-      const injected = await f.action('inject', { id: side })
+      const injected = await f.action('inject', {
+        id: side,
+        draft: 'Also check\nthe login *flow*',
+      })
       expect([injected.status, injected.data.error]).toEqual([200, undefined])
     } finally {
       await writeFile(
@@ -794,6 +797,9 @@ describe('side chats', () => {
       (entry) => entry.kind === 'sidechat.summary',
     )!
     expect(summary.data).toMatchObject({ side, item: item.key, to: f.main })
+    expect((summary.data as { text: string }).text).toMatch(
+      /\n\nThe user's unsent draft, word for word:\n\n> Also check\n> the login \*flow\*$/,
+    )
     expect(JSON.stringify(summary.model)).toContain(`from #${added.id}, which is concluded`)
     expect(
       (await entries(f.server, added.id)).some((entry) => entry.kind === 'sidechat.summary'),

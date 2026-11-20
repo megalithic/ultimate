@@ -82,12 +82,14 @@ export const DiscardAction = actionRef<{ id: ConversationId }, { id: Conversatio
 /**
  * `{id, answer?}` → `{id}`: abort, summarize into main without waking it, and conclude. With `answer` (a question
  * side chat, `{answers?, note?}` or `{text}` as for questions' answer), the same durable task then answers the open
- * question; it is refused up front when the question is no longer open. Requires summaryModel. User-only.
+ * question; it is refused up front when the question is no longer open. `draft`, the user's unsent composer text,
+ * is quoted word for word under the summary. Requires summaryModel. User-only.
  */
 export const InjectAction = actionRef<
   {
     id: ConversationId
     answer?: Reply
+    draft?: string
   },
   { id: ConversationId }
 >('side-chat', 'inject')
