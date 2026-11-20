@@ -1007,6 +1007,18 @@ it.concurrent('lets an ownerless history fork submit its own workspace', async (
   expect(report).toContain('landed as')
   expect(await readFile(join(f.projectRoot, 'branch.txt'), 'utf8')).toBe('branch.txt')
 })
+it.concurrent('refuses submit when the project ships through pull requests', async () => {
+  const f = await lander({ mode: 'pr', checks: ['test -f base.txt'] })
+  const id = await f.create()
+  await f.service.ready(id, context)
+  await commit((await f.service.get(id, context))!.path, 'pr.txt')
+  await expect(f.service.submit(id, 'None', context)).rejects.toThrow('ships through pull requests')
+  expect(
+    (await f.opened.harness.snapshot(Workspaces, ROOT_CONVERSATION_ID, context))!.queue,
+  ).toEqual([])
+  f.host.projectSettings = async () => ({ lander: { mode: 'squash' } })
+  await expect(f.service.submit(id, 'None', context)).rejects.toThrow('lander.mode must be')
+})
 it.concurrent('lands and reports a submission without a lineage provider', async () => {
   const f = await lander({ checks: ['test -f base.txt'] })
   expect(f.host.want(LineageApi)).toBeUndefined()

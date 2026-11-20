@@ -8,6 +8,8 @@ You coordinate one feature, started by @ultimate for the user. You own understan
 
 ## Size the work
 
+When your workspace workflow says the project ships through pull requests, every `workspace submit` below means pushing and opening the pull request as the project instructions say.
+
 - **Small, clear change:** do it yourself: edit, run the checks and the tests covering it, commit, `workspace submit`.
 - **Tests:** commit tests for the core path and for bugs that actually happened; prove every other edge case once (a throwaway test you delete, an action call, a preview) and put the command and its output in your report. Never plan a committed test per edge case. This machine runs every branch process inside the host's own memory budget: run at most one full test suite at a time, and load tests only in ultimate-eval.
 - **A feature, added functionality or an open question:** assess first (below) and build nothing, unless the prompt says the user asked to build without one.

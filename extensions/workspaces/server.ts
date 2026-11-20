@@ -34,7 +34,7 @@ import {
 } from './refs.ts'
 import type { GithubRepo } from './refs.ts'
 import { githubRepo, readGithubRepo } from '../../lib/project-identity.ts'
-import { sweepChecks } from './lander.ts'
+import { landsThroughPullRequests, prOnlyLanding, sweepChecks } from './lander.ts'
 import { landingPending, pendingLandingCards, Workspaces, workspaces } from './workspaces.ts'
 import { rebuiltOnOpen } from '../../lib/errors.ts'
 export const order = -200
@@ -265,6 +265,7 @@ export default function workspaceExtension(host: ExtensionHost) {
           .commit((tx) => tx.conversation(input.conversationId), caller)
         if (row?.owner)
           return `${head} You are a subagent: commit your verified work in this worktree and report the commit to your owner, who lands it. Only a top-level conversation can \`workspace submit\`.`
+        if (await landsThroughPullRequests(host)) return `${head} ${prOnlyLanding}`
         return `${head} Finish with \`workspace submit\` once your tip is committed and verified: the lander merges it into ${own.target} with whatever landed meanwhile, runs the project's checks, fast-forwards ${own.target} and pushes when configured; keep working meanwhile and do not merge ${own.target} yourself first. A failure comes back to you as a message: fix it and submit again. A landing reaches whoever started you as its card, and concludes you unless other work is still under way.`
       }),
     ],

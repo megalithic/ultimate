@@ -36,7 +36,9 @@ import {
   hasPendingLanderReport,
   landerCheckout,
   landerPath,
+  landsThroughPullRequests,
   log,
+  prOnlyLanding,
 } from './lander.ts'
 import type {
   LandResult,
@@ -765,6 +767,7 @@ export function workspaces(host: Host) {
         "Submitting requires divergence: describe changes from the original request, or say 'None'.",
       )
     divergence = divergence.trim()
+    if (await landsThroughPullRequests(host)) throw new Error(prOnlyLanding)
     const workspace = await get(id, context)
     if (!workspace) throw new Error('Conversation has no workspace')
     if (workspace.state !== 'ready') throw new Error(`Workspace is ${workspace.state}`)

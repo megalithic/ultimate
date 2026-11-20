@@ -261,6 +261,15 @@ export const landerSettings = async (host: Pick<Host, 'projectSettings'>): Promi
     ...(pushOutsidePreview ? { push: pushOutsidePreview } : {}),
   }
 }
+export const prOnlyLanding =
+  'This project ships through pull requests, so `workspace submit` is refused: once your tip is committed and verified, push it and open the pull request as the project instructions say.'
+/** `lander.mode: "pr"`: the project lands only through pull requests, never the lander. */
+export const landsThroughPullRequests = async (host: Pick<Host, 'projectSettings'>) => {
+  const mode = ((await host.projectSettings()).lander as { mode?: unknown } | undefined)?.mode
+  if (mode !== undefined && mode !== 'pr')
+    throw new Error('lander.mode must be "pr" or left out')
+  return mode === 'pr'
+}
 export const contains = (cwd: string, ancestor: string, descendant: string) =>
   git(cwd, 'merge-base', '--is-ancestor', ancestor, descendant).then(
     () => true,

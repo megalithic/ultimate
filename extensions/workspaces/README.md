@@ -106,6 +106,11 @@ The lander is the only way to a project's target branch, and it is code: no mode
 landing result appear in the submitting conversation as tool and outcome cards. The `@lander` conversation keeps the
 full log in `ultimate.lander` entries and refuses every input.
 
+A project that ships only through pull requests sets `lander.mode: "pr"` in `.ultimate/settings.json`: the
+`workspace_workflow` prompt section then tells top-level branches to push and open the pull request as the project
+instructions say, and `workspace submit` refuses with the same pointer before queueing anything. Any other value is
+an error.
+
 `workspace submit` requires a non-empty `divergence` string: how the delivered result differs from the original
 request (new agreements, different approach or library, changed scope), or "None" when it matches. It queues a
 top-level main's clean tip in the root document's `queue` and returns its position and lander conversation at once;
