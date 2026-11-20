@@ -380,16 +380,26 @@ it('reads tool numbers from the trace, with unused tools and frequent errors', a
   )
   insert.run('3', 300, 5, 'tool', 'read', 1, null, null, null, null)
   insert.run('4', 50, 5, 'action', 'dream/stats', 1, null, null, null, null)
+  const long = `ENOENT while loading the project ${'x'.repeat(300)} missing: /tmp/a/b.ts`
+  insert.run('5', 400, 50, 'tool', 'bash', 0, long, '{}', 8, 9)
   db.close()
   expect(toolStats(file, ['edit', 'read', 'notify'])).toEqual({
     since: 100,
-    calls: 3,
+    calls: 4,
     tools: [
-      { name: 'edit', calls: 2, failed: 1, avgMs: 20 },
-      { name: 'read', calls: 1, failed: 0, avgMs: 5 },
+      { name: 'edit', calls: 2, failed: 1, avgMs: 20, p50Ms: 10, p95Ms: 30 },
+      { name: 'read', calls: 1, failed: 0, avgMs: 5, p50Ms: 5, p95Ms: 5 },
+      { name: 'bash', calls: 1, failed: 1, avgMs: 50, p50Ms: 50, p95Ms: 50 },
     ],
     unused: ['notify'],
     errors: [
+      {
+        name: 'bash',
+        error: long.slice(0, 160),
+        tail: long.slice(-240),
+        count: 1,
+        examples: [{ at: '#8/9', args: '{}' }],
+      },
       {
         name: 'edit',
         error: 'Could not find the exact text',

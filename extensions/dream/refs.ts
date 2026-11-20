@@ -85,12 +85,25 @@ export const SwitchAction = actionRef<{ chapter: string }, never>('dream', 'swit
 export type ToolStats = {
   since?: number
   calls: number
-  tools: { name: string; calls: number; failed: number; avgMs: number }[]
+  /** Durations per tool: mean, median (`p50Ms`) and 95th percentile (`p95Ms`). */
+  tools: {
+    name: string
+    calls: number
+    failed: number
+    avgMs: number
+    p50Ms: number
+    p95Ms: number
+  }[]
   unused: string[]
-  /** The most frequent errors, each with its two newest calls: `#<conversation>/<entry>` and the start of its args. */
+  /**
+   * The most frequent errors, grouped by their first 160 characters, each with its two newest calls:
+   * `#<conversation>/<entry>` and the start of its args. `tail` is the last 240 characters of the newest
+   * error when it is longer than 160, where a missing path or the real cause is often named.
+   */
   errors: {
     name: string
     error: string
+    tail?: string
     count: number
     examples: { at: string; args: string }[]
   }[]
