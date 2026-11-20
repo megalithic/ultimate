@@ -595,13 +595,13 @@ function DraftGuardRow({
 }) {
   const inject = guard.how === 'inject'
   return (
-    <div className="flex items-center gap-2" data-draft-guard role="alert">
+    <div className="flex flex-wrap items-center justify-end gap-2" data-draft-guard role="alert">
       <span className="mr-auto min-w-0 truncate font-mono text-[11px] text-warning">
         {phone
           ? 'Unsent draft'
           : inject
-            ? `Your composer holds an unsent draft${guard.attachments ? ' · attachments stay out' : ''}`
-            : 'Your composer holds an unsent draft · discarding leaves it out'}
+            ? `Unsent draft in the composer${guard.attachments ? ' · attachments stay out' : ''}`
+            : 'Unsent draft · Discard loses it'}
       </span>
       <Button autoFocus onClick={() => settle('keep')} size="sm" variant="ghost">
         Keep editing
