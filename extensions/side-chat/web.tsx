@@ -384,7 +384,11 @@ function Stage() {
   )
 }
 
-function SidePane({
+function SidePane(props: Parameters<typeof SideChatPane>[0]) {
+  return <SideChatPane key={props.side} {...props} />
+}
+
+function SideChatPane({
   side,
   index,
   front,
@@ -414,14 +418,22 @@ function SidePane({
       paneOpen.current = false
     }
   }, [])
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const leave = () => {
       const left = pending.current
       pending.current = undefined
       left?.settle(left.onDeparture)
-    },
-    [],
-  )
+    }
+    const pageLeaves = () => {
+      paneOpen.current = false
+      leave()
+    }
+    window.addEventListener('pagehide', pageLeaves)
+    return () => {
+      window.removeEventListener('pagehide', pageLeaves)
+      leave()
+    }
+  }, [])
   const settle = (choice: DraftChoice) => {
     const current = pending.current
     pending.current = undefined
@@ -430,7 +442,7 @@ function SidePane({
   }
   const guarded = (
     how: 'discard' | 'inject',
-    go: (draft?: SentDraft) => Promise<unknown>,
+    go: (draft?: SentDraft, leaving?: boolean) => Promise<unknown>,
     {
       departing = false,
       onDeparture = 'keep',
@@ -439,7 +451,7 @@ function SidePane({
     const draft = composerDraft(side)
     if (!draft) return go()
     const sent = { text: draft.text, revision: draft.revision }
-    if (departing || !paneOpen.current) return go(draft.text.trim() ? sent : undefined)
+    if (departing || !paneOpen.current) return go(draft.text.trim() ? sent : undefined, true)
     settle('keep')
     return new Promise<unknown>((resolve, reject) => {
       pending.current = {
@@ -450,7 +462,7 @@ function SidePane({
         settle: (choice) => {
           if (choice === 'keep')
             return reject(new Error('Nothing was sent: your draft is still there'))
-          go(choice === 'include' ? sent : undefined).then(resolve, reject)
+          go(choice === 'include' ? sent : undefined, !paneOpen.current).then(resolve, reject)
         },
       }
       setGuard(pending.current)
@@ -512,8 +524,8 @@ function SidePane({
           answerWith={(answer, keepalive) =>
             guarded(
               'inject',
-              (draft) =>
-                injectWith(draft, { answer }, keepalive).catch((failure: unknown) => {
+              (draft, leaving) =>
+                injectWith(draft, { answer }, keepalive || leaving).catch((failure: unknown) => {
                   throw new Error(
                     `Nothing was sent: ${errorMessage(failure).replace(/^side-chat\/\w+: /, '')}`,
                   )
