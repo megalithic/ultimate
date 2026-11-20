@@ -104,14 +104,22 @@ export function prepare(args: unknown, now: number): Prepared {
 
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/
 
+function isoTimeOnRealDay(value: string) {
+  if (!ISO_TIME.test(value)) return Number.NaN
+  const day = Date.parse(value.slice(0, 10))
+  if (Number.isNaN(day) || new Date(day).toISOString().slice(0, 10) !== value.slice(0, 10))
+    return Number.NaN
+  return Date.parse(value)
+}
+
 export function statsSince(args: unknown): number | undefined {
   const since = fields(args).since
   if (since === undefined) return undefined
   const at =
     typeof since === 'number'
       ? since
-      : typeof since === 'string' && ISO_TIME.test(since)
-        ? Date.parse(since)
+      : typeof since === 'string'
+        ? isoTimeOnRealDay(since)
         : Number.NaN
   if (!Number.isFinite(at))
     throw new Error(`since must be an ISO time or epoch milliseconds: ${JSON.stringify(since)}`)

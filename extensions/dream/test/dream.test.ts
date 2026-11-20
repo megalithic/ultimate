@@ -429,7 +429,7 @@ it('reads tool numbers from the trace, with unused tools and frequent errors', a
   })
   expect(statsSince({ since: new Date(250).toISOString() })).toBe(250)
   expect(statsSince(null)).toBeUndefined()
-  for (const since of ['yesterday', 'March 1, 2026', '2026-13-01', true])
+  for (const since of ['yesterday', 'March 1, 2026', '2026-13-01', '2026-02-30T00:00:00Z', true])
     expect(() => statsSince({ since })).toThrow(/ISO time or epoch milliseconds/)
   expect(toolStats(join(await temp(), 'none.sqlite'), ['read']).unused).toEqual(['read'])
 })
