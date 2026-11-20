@@ -784,7 +784,7 @@ describe('side chats', () => {
     try {
       const injected = await f.action('inject', {
         id: side,
-        draft: 'Also check\nthe login *flow*',
+        draft: '  Also check\nthe login *flow*\n',
       })
       expect([injected.status, injected.data.error]).toEqual([200, undefined])
     } finally {
@@ -798,7 +798,7 @@ describe('side chats', () => {
     )!
     expect(summary.data).toMatchObject({ side, item: item.key, to: f.main })
     expect((summary.data as { text: string }).text).toMatch(
-      /\n\nThe user's unsent draft, word for word:\n\n> Also check\n> the login \*flow\*$/,
+      /\n\nThe user's unsent draft, word for word:\n\n>   Also check\n> the login \*flow\*\n> $/,
     )
     expect(JSON.stringify(summary.model)).toContain(`from #${added.id}, which is concluded`)
     expect(

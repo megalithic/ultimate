@@ -210,11 +210,15 @@ async function end(
       answer === undefined || !message ? undefined : replyText(answer, message.questions ?? [])
     if (mode === 'injected' && ending.mode === mode && ending.task !== undefined) {
       const running = (await tx.task(ending.task))?.input as
-        | { reply?: { text: string } }
+        | { reply?: { text: string }; draft?: string }
         | undefined
       if (running?.reply?.text !== replyTextWanted)
         throw new Error(
           `Side chat #${id} is already ending ${running?.reply === undefined ? 'without an answer' : 'with another answer'}`,
+        )
+      if ((running?.draft ?? '') !== (draft ?? ''))
+        throw new Error(
+          `Side chat #${id} is already ending ${running?.draft ? 'with another draft' : 'without your draft'}`,
         )
       return ending.task
     }
@@ -369,8 +373,8 @@ export function endTask(host: ExtensionHost) {
             }, ctx)
             return
           }
-          const draft = task.input.draft?.trim()
-          const text = draft
+          const draft = task.input.draft
+          const text = draft?.trim()
             ? `${response.text.trim()}\n\nThe user's unsent draft, word for word:\n\n${draft.replace(/^/gm, '> ')}`
             : response.text.trim()
           const at = await host.harness().commit((tx) => tx.entry(side.at!), ctx)

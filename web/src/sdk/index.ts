@@ -85,7 +85,7 @@ export { useTranscriptScroll } from '../app/transcript.tsx'
 export { AllProvided, Provided, Rendered } from '../app/boundary.tsx'
 export { ConversationScope } from './conversation-scope.tsx'
 /** Sends what the composer inside it submits somewhere else, such as a new side chat; see `composer` renderers. */
-/** `composerDraft(id)` is what a composer holds unsent (text, image and file counts) or undefined; `clearComposer(id)` empties it. */
+/** `composerDraft(id)` is what a composer holds unsent (text, revision, image and file counts) or undefined; `clearComposer(id, sent)` empties its text when it is still the sent `{text, revision}`, attachments kept. */
 export {
   clearComposer,
   Composer,

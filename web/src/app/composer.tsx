@@ -249,16 +249,14 @@ export function fillComposer(id: number, text: string) {
 }
 
 export function composerDraft(id: number) {
-  const { text, images, files } = getDraft(id).get()
+  const { text, images, files, revision } = getDraft(id).get()
   return text.trim() || images.length || files.length
-    ? { text, images: images.length, files: files.length }
+    ? { text, revision, images: images.length, files: files.length }
     : undefined
 }
 
-export function clearComposer(id: number) {
-  const draft = getDraft(id)
-  draft.set({ text: '', images: [], files: [], revision: draft.get().revision + 1 })
-  if (draft.key) localStorage.removeItem(draft.key)
+export function clearComposer(id: number, sent: { text: string; revision: number }) {
+  clearDraft(getDraft(id), sent)
 }
 
 export function insertIntoComposer(id: number, text: string) {

@@ -406,38 +406,67 @@ function SidePane({
     if (front) document.getElementById(`composer-input-${side}`)?.focus()
   }, [front, side])
   const [guard, setGuard] = useState<DraftGuard>()
-  const settle = (choice: 'keep' | 'include' | 'without') => {
+  const pending = useRef<DraftGuard>(undefined)
+  const paneOpen = useRef(true)
+  useLayoutEffect(() => {
+    paneOpen.current = true
+    return () => {
+      paneOpen.current = false
+    }
+  }, [])
+  useEffect(
+    () => () => {
+      const left = pending.current
+      pending.current = undefined
+      left?.settle(left.onDeparture)
+    },
+    [],
+  )
+  const settle = (choice: DraftChoice) => {
+    const current = pending.current
+    pending.current = undefined
     setGuard(undefined)
-    guard?.settle(choice)
+    current?.settle(choice)
   }
-  const guarded = (how: 'discard' | 'inject', go: (draft?: string) => Promise<unknown>) => {
+  const guarded = (
+    how: 'discard' | 'inject',
+    go: (draft?: SentDraft) => Promise<unknown>,
+    {
+      departing = false,
+      onDeparture = 'keep',
+    }: { departing?: boolean; onDeparture?: DraftChoice } = {},
+  ) => {
     const draft = composerDraft(side)
     if (!draft) return go()
-    guard?.settle('keep')
-    return new Promise<unknown>((resolve, reject) =>
-      setGuard({
+    const sent = { text: draft.text, revision: draft.revision }
+    if (departing || !paneOpen.current) return go(draft.text.trim() ? sent : undefined)
+    settle('keep')
+    return new Promise<unknown>((resolve, reject) => {
+      pending.current = {
         how,
+        onDeparture,
         attachments: draft.images + draft.files,
         text: draft.text.trim() !== '',
         settle: (choice) => {
           if (choice === 'keep')
             return reject(new Error('Nothing was sent: your draft is still there'))
-          go(choice === 'include' ? draft.text : undefined).then(resolve, reject)
+          go(choice === 'include' ? sent : undefined).then(resolve, reject)
         },
-      }),
-    )
+      }
+      setGuard(pending.current)
+    })
   }
   const injectWith = async (
-    draft: string | undefined,
+    draft: SentDraft | undefined,
     args: { answer?: Reply },
     keepalive = false,
   ) => {
     const result = await api.action(
       InjectAction,
-      { id: side, ...args, ...(draft ? { draft } : {}) },
+      { id: side, ...args, ...(draft ? { draft: draft.text } : {}) },
       { keepalive },
     )
-    if (draft) clearComposer(side)
+    if (draft) clearComposer(side, draft)
     return result
   }
   const end = (how: 'discard' | 'inject') =>
@@ -481,12 +510,15 @@ function SidePane({
       {question !== undefined && (
         <PinnedQuestion
           answerWith={(answer, keepalive) =>
-            guarded('inject', (draft) =>
-              injectWith(draft, { answer }, keepalive).catch((failure: unknown) => {
-                throw new Error(
-                  `Nothing was sent: ${errorMessage(failure).replace(/^side-chat\/\w+: /, '')}`,
-                )
-              }),
+            guarded(
+              'inject',
+              (draft) =>
+                injectWith(draft, { answer }, keepalive).catch((failure: unknown) => {
+                  throw new Error(
+                    `Nothing was sent: ${errorMessage(failure).replace(/^side-chat\/\w+: /, '')}`,
+                  )
+                }),
+              { departing: keepalive, onDeparture: 'include' },
             )
           }
           keys={front && !phone}
@@ -577,11 +609,14 @@ function SidePane({
   )
 }
 
+type DraftChoice = 'keep' | 'include' | 'without'
+type SentDraft = { text: string; revision: number }
 type DraftGuard = {
   how: 'discard' | 'inject'
   text: boolean
   attachments: number
-  settle: (choice: 'keep' | 'include' | 'without') => void
+  onDeparture: DraftChoice
+  settle: (choice: DraftChoice) => void
 }
 
 function DraftGuardRow({
