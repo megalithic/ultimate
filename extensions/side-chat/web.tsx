@@ -427,10 +427,16 @@ function SideChatPane({
     const pageLeaves = () => {
       paneOpen.current = false
       leave()
+      setGuard(undefined)
+    }
+    const pageReturns = () => {
+      paneOpen.current = true
     }
     window.addEventListener('pagehide', pageLeaves)
+    window.addEventListener('pageshow', pageReturns)
     return () => {
       window.removeEventListener('pagehide', pageLeaves)
+      window.removeEventListener('pageshow', pageReturns)
       leave()
     }
   }, [])
