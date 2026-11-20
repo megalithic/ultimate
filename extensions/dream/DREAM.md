@@ -9,8 +9,9 @@ itself.
 
 A dream is ordinary work: one branch, its answer, the user's decisions, ordinary branches for what they approve. There
 is no session to track. Dream's actions, called with codemode `ultimate.action('dream', name, args)`: `prepare
-{chapter, learned, handoff}` and `stats` (tool numbers from the trace, no model). `stats` counts tool calls over the
-whole retained trace: about the last 7 days, or the newest 200,000 calls, whichever ends first. `debug trace` and
+{chapter, learned, handoff}` and `stats {since?}` (tool numbers from the trace, no model). `stats` counts tool calls
+over the chapter's whole retained trace: about the last 7 days, or the newest 200,000 calls, whichever ends first;
+`since` (an ISO time or epoch ms) keeps only calls at or after it. `debug trace` and
 `ultimate.trace` do not read that window whole: they return the newest rows only (the newest 100 by default for
 `ultimate.trace`, 50 for `debug trace`, at most 1000, and `debug trace` cuts its text at about 160 rows), so on a busy
 project a query can cover hours rather than days. For older failures and model errors, read conversation entries and
@@ -31,9 +32,13 @@ A dream starts when it is asked for, all the same way:
 If a dream branch is already running, say so in one line and do nothing else. Otherwise, in that same turn, while your
 context still holds everything, write your **handoff**: what you worked on, what is still open (branches, questions,
 to-dos) and how far each got, the decisions and why, the user's corrections, the lessons, and what you would do next.
-Start one branch with `branch`, the handoff in its prompt:
+Before you branch, read the previous dream's time in this chapter: `(await ultimate.doc('dream.next', 1)).dream?.at`
+(epoch ms; the new branch replaces it once it starts). Start one branch with `branch`, the handoff in its prompt, and
+the previous dream line only when there was one:
 
 > Dream. Follow "For the dream branch" in the clone's extensions/dream/DREAM.md.
+>
+> Previous dream: <its `at`, as epoch ms>; pass it as `since` to `stats`.
 >
 > My handoff:
 > …
@@ -115,8 +120,9 @@ tally, `ultimate.entries(<root>)`) are the cheap way in; open a conversation onl
   and evidence (the memory review in extensions/lineage/README.md). Never drop or weaken the memory about the user.
 - **failures** — what failed often: `watchdog.failure` cards, tool and action errors in the trace, retries, reactor
   failures, lander rejections, runs the user had to stop. Group by cause; for the top ones propose a fix.
-- **tools** — `stats` gives calls, failures, mean, p50 and p95 duration, enabled tools never called, and the frequent
-  errors with their start and, for long ones, their end (`tail`), where the real cause is often named. Explain the numbers: why a
+- **tools** — `stats` (with `since` set to the previous dream's time when the prompt names one; without it, the
+  chapter's trace, which begins after the last chapter's dream) gives calls, failures, mean, p50 and p95 duration,
+  enabled tools never called, and the frequent errors with their start and, for long ones, their end (`tail`), where the real cause is often named. Explain the numbers: why a
   tool fails, which are slow, which unused ones should be taught or removed, what agents did by hand that a tool
   should do.
 - **corrections** — what the user had to say more than once, corrections of the agents' work, and the wishes: what

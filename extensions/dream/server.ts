@@ -102,25 +102,37 @@ export function prepare(args: unknown, now: number): Prepared {
   }
 }
 
-export function toolStats(database: string, enabled: readonly string[]): ToolStats {
+export function statsSince(args: unknown): number | undefined {
+  const since = fields(args).since
+  if (since === undefined) return undefined
+  const at =
+    typeof since === 'number' ? since : typeof since === 'string' ? Date.parse(since) : Number.NaN
+  if (!Number.isFinite(at))
+    throw new Error(`since must be an ISO time or epoch milliseconds: ${JSON.stringify(since)}`)
+  return at
+}
+
+export function toolStats(database: string, enabled: readonly string[], since = 0): ToolStats {
   if (!existsSync(database))
     return { calls: 0, tools: [], unused: [...enabled].toSorted(), errors: [] }
   const db = new DatabaseSync(database, { readOnly: true })
   try {
     const window = db
-      .prepare("SELECT min(at) AS since, count(*) AS calls FROM calls WHERE kind = 'tool'")
-      .get() as { since: number | null; calls: number }
+      .prepare(
+        "SELECT min(at) AS since, count(*) AS calls FROM calls WHERE kind = 'tool' AND at >= ?",
+      )
+      .get(since) as { since: number | null; calls: number }
     const tools = (
       db
         .prepare(
-          "SELECT name, count(*) AS calls, sum(ok = 0) AS failed, avg(ms) AS avgMs FROM calls WHERE kind = 'tool' GROUP BY name ORDER BY calls DESC",
+          "SELECT name, count(*) AS calls, sum(ok = 0) AS failed, avg(ms) AS avgMs FROM calls WHERE kind = 'tool' AND at >= ? GROUP BY name ORDER BY calls DESC",
         )
-        .all() as { name: string; calls: number; failed: number; avgMs: number }[]
+        .all(since) as { name: string; calls: number; failed: number; avgMs: number }[]
     ).map((row) => ({ ...row, avgMs: Math.round(row.avgMs) }))
     const durations = new Map<string, number[]>()
     for (const { name, ms } of db
-      .prepare("SELECT name, ms FROM calls WHERE kind = 'tool' ORDER BY name, ms")
-      .iterate() as Iterable<{ name: string; ms: number }>) {
+      .prepare("SELECT name, ms FROM calls WHERE kind = 'tool' AND at >= ? ORDER BY name, ms")
+      .iterate(since) as Iterable<{ name: string; ms: number }>) {
       if (!durations.has(name)) durations.set(name, [])
       durations.get(name)!.push(ms)
     }
@@ -130,14 +142,14 @@ export function toolStats(database: string, enabled: readonly string[]): ToolSta
     }
     const groups = db
       .prepare(
-        "SELECT name, substr(error, 1, 160) AS error, count(*) AS count FROM calls WHERE kind = 'tool' AND ok = 0 GROUP BY name, substr(error, 1, 160) ORDER BY count DESC LIMIT 20",
+        "SELECT name, substr(error, 1, 160) AS error, count(*) AS count FROM calls WHERE kind = 'tool' AND at >= ? AND ok = 0 GROUP BY name, substr(error, 1, 160) ORDER BY count DESC LIMIT 20",
       )
-      .all() as { name: string; error: string; count: number }[]
+      .all(since) as { name: string; error: string; count: number }[]
     const sample = db.prepare(
-      "SELECT conversation, entry, substr(args, 1, 120) AS args, CASE WHEN length(error) > 160 THEN substr(error, -240) END AS tail FROM calls WHERE kind = 'tool' AND ok = 0 AND name = ? AND substr(error, 1, 160) = ? ORDER BY at DESC LIMIT 2",
+      "SELECT conversation, entry, substr(args, 1, 120) AS args, CASE WHEN length(error) > 160 THEN substr(error, -240) END AS tail FROM calls WHERE kind = 'tool' AND at >= ? AND ok = 0 AND name = ? AND substr(error, 1, 160) = ? ORDER BY at DESC LIMIT 2",
     )
     const errors = groups.map((group) => {
-      const rows = sample.all(group.name, group.error) as {
+      const rows = sample.all(since, group.name, group.error) as {
         conversation: ConversationId | null
         entry: number | null
         args: string | null
@@ -387,13 +399,14 @@ export const actions = {
     host.harness().resume()
     return prepared
   }),
-  stats: implementAction(StatsAction, (_args, { host }) =>
+  stats: implementAction(StatsAction, (args, { host }) =>
     toolStats(
       host.chapter.trace,
       host
         .extensions()
         .filter((item) => item.enabled)
         .flatMap((item) => item.server?.tools.map((tool) => tool.name) ?? []),
+      statsSince(args),
     ),
   ),
 }

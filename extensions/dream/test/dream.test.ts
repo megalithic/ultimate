@@ -18,7 +18,7 @@ import { Todos } from '../../todos/server.ts'
 import { Standing } from '../../subagents/api.ts'
 import { ContextUsageDoc } from '../../conversations/api.ts'
 import automations, { actions as automationActions, Automations } from '../../automations/server.ts'
-import dream, { actions, branched, Next, toolStats, userActions } from '../server.ts'
+import dream, { actions, branched, Next, statsSince, toolStats, userActions } from '../server.ts'
 import { buildSeed } from '../seed.ts'
 import {
   AUTOMATION_NAME,
@@ -408,5 +408,27 @@ it('reads tool numbers from the trace, with unused tools and frequent errors', a
       },
     ],
   })
+  // A delta dream: only calls at or after `since`, in every part of the result.
+  expect(toolStats(file, ['edit', 'read', 'notify'], statsSince({ since: 250 }))).toEqual({
+    since: 300,
+    calls: 2,
+    tools: [
+      { name: 'read', calls: 1, failed: 0, avgMs: 5, p50Ms: 5, p95Ms: 5 },
+      { name: 'bash', calls: 1, failed: 1, avgMs: 50, p50Ms: 50, p95Ms: 50 },
+    ],
+    unused: ['edit', 'notify'],
+    errors: [
+      {
+        name: 'bash',
+        error: long.slice(0, 160),
+        tail: long.slice(-240),
+        count: 1,
+        examples: [{ at: '#8/9', args: '{}' }],
+      },
+    ],
+  })
+  expect(statsSince({ since: new Date(250).toISOString() })).toBe(250)
+  expect(statsSince(null)).toBeUndefined()
+  expect(() => statsSince({ since: 'yesterday' })).toThrow(/ISO time or epoch milliseconds/)
   expect(toolStats(join(await temp(), 'none.sqlite'), ['read']).unused).toEqual(['read'])
 })
