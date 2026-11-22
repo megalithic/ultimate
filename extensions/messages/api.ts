@@ -119,7 +119,7 @@ export type MessagesService = {
    */
   tell(
     from: ConversationId,
-    input: { project: string; machine?: string; text: string; reply?: boolean },
+    input: { project: string; machine?: string; text: string; reply?: boolean; call?: string },
     ctx: Context,
   ): Promise<{ message: number; delivered: number }>
   /**

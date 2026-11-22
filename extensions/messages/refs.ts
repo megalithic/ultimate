@@ -94,6 +94,18 @@ export const RemoteProgressAction = actionRef<{ project: string }, RemoteProgres
   'remoteProgress',
 )
 
+/** Where another project's Ultimate is reachable, for a `message N@project` link: its address and, when it has one, its tailnet address. */
+export type Instance =
+  | { url: string; label: string; name: string; tailnet?: string }
+  | { current: true }
+  | { error: string }
+
+/** `{ project, machine? }` → that project's instance, found only among known projects and remotes; read-only. */
+export const InstanceAction = actionRef<{ project: string; machine?: string }, Instance>(
+  'messages',
+  'instance',
+)
+
 /** The conversation that started a branch, read-only in the browser. */
 export const StartedDoc = docRef<{ by?: ConversationId }>('board.started')
 

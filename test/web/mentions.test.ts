@@ -5,6 +5,7 @@ import {
   mentionHref,
   parseMention,
   parseMessageMention,
+  parseRemoteMessageMention,
   remarkMentions,
   splitMentions,
 } from '../../web/src/components/ai/mentions.ts'
@@ -119,4 +120,26 @@ it('links message and card ids in prose, which name a card by its global id alon
     'message 706',
     'card 12',
   ])
+})
+
+it('links a message on another project, optionally on a named machine', () => {
+  const parts = splitMentions(
+    "sent to swifties (message 501@swifties), mega's message 7@.dotfiles:megabookpro.",
+  ).filter((part) => typeof part !== 'string')
+  expect(parts.map((part) => [part.text, part.href])).toEqual([
+    ['message 501@swifties', '#message-501@swifties'],
+    ['message 7@.dotfiles:megabookpro', '#message-7@.dotfiles:megabookpro'],
+  ])
+  expect(parseRemoteMessageMention('#message-501@swifties')).toEqual({
+    message: 501,
+    project: 'swifties',
+  })
+  expect(parseRemoteMessageMention('#message-7@.dotfiles:megabookpro')).toEqual({
+    message: 7,
+    project: '.dotfiles',
+    machine: 'megabookpro',
+  })
+  expect(parseMessageMention('#message-501@swifties')).toBeUndefined()
+  expect(parseRemoteMessageMention('#message-501')).toBeUndefined()
+  expect(mentions('message 5@3pm, message 5@ noon, card 2@x@y')).toEqual([])
 })

@@ -83,7 +83,16 @@ notice. `messages:open {conversation, entry | call}` reveals that entry or call 
 
 `message 706` and `card 706` in agent text render as that link (`MessageResponse` and `MentionText`; the `link`
 renderer is `mention.tsx`). The messages prompt section tells agents to write `message <id>` when they point the user
-at a card.
+at a card, and `message <id>@<project>` (or `@<project>:<machine>`) for an id on another project's Ultimate, such as
+`ultimate.tell`'s `delivered`. That link asks the `instance` action where the project runs and opens
+`<its url>/?message=<id>` in one named tab per instance, reused on the next click. Only addresses the server already
+trusts (running projects on this machine, `remotes` in user settings, cloud backups) open, never one from the link
+text: from a page not on loopback a loopback instance opens at its own tailnet address, and one without a tailscale
+address shows a quiet notice instead; an unknown or stopped project shows "… isn't running" or its `locate` error.
+
+A tell from codemode records its call (`<codemode call>/tell`), so `message <id>` reveals its card in the sender's
+transcript, which shows each tell with an "open in <project>" button once delivered. An older tell without a call
+opens the target's copy instead.
 
 ## Ultimate and branches
 
@@ -143,6 +152,8 @@ are a conversation id, `'user'` or `'remote'`; `state` is `sent`, `delivered`, `
 - `remoteProgress({ project }) → { reachable, progress? }`: polls the project's `status/status` action with a short
   timeout. Progress is `{ label, index, total }` when provided. Unreachable or current-project targets return
   `reachable: false`.
+- `instance({ project, machine? }) → { url, label, name, tailnet? } | { current: true } | { error }`: where a
+  `message N@project` link opens, from `locate`; `tailnet` is that instance's own tailscale `status` url.
 - `addresses({}) → { agents, conversations }`: resident names and descriptions, with an id once created, and up to 50
   recent top-level conversation summaries.
 - `settle({ messageId, text, dismiss? }) → { id }`: from @ultimate's conversation or its side chat, settles the user's

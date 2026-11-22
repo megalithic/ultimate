@@ -63,13 +63,13 @@ export async function projectsSection(
       }),
   )
   if (!lines.length) return undefined
-  return `Other projects on this machine and their standing agents besides their own @ultimate. Reach one with codemode \`ultimate.tell({project, text, reply?, machine?}): Promise<{message, delivered}>\`; its @ultimate routes to the others. With reply (default true) its answer returns to you as a reply; machine picks one instance when the project runs on several.\n${lines.join('\n')}`
+  return `Other projects on this machine and their standing agents besides their own @ultimate. Reach one with codemode \`ultimate.tell({project, text, reply?, machine?}): Promise<{message, delivered}>\`; its @ultimate routes to the others. With reply (default true) its answer returns to you as a reply; machine picks one instance when the project runs on several. \`delivered\` is the target's id: point at it as \`message <delivered>@<project>\`, never as a local \`message <id>\`.\n${lines.join('\n')}`
 }
 
 export async function tell(
   host: ExtensionHost,
   from: ConversationId,
-  input: { project: string; machine?: string; text: string; reply?: boolean },
+  input: { project: string; machine?: string; text: string; reply?: boolean; call?: string },
   ctx: Context,
 ) {
   const standing = await host.harness().snapshot(Standing, ROOT_CONVERSATION_ID, ctx)
@@ -109,6 +109,7 @@ export async function tell(
       reply,
       state: 'sent',
       remote,
+      ...(input.call === undefined ? {} : { call: input.call }),
     })
     if (reply) {
       const owned = await serve(host, tx, from, { kind: 'tell', key: remote.key })

@@ -2220,7 +2220,11 @@ it("returns another Ultimate's answer as a reply once, and refuses a reply to a 
   const f = await remoteFixture(other.url)
   const told = await f
     .service()
-    .tell(ROOT_CONVERSATION_ID, { project: 'poe2-rust', text: 'Did the landing work?' }, context)
+    .tell(
+      ROOT_CONVERSATION_ID,
+      { project: 'poe2-rust', text: 'Did the landing work?', call: 'script-1/tell' },
+      context,
+    )
   expect(told.delivered).toBe(41)
   const key = (other.posted[0].body as { key: string }).key
   expect(other.posted[0].body).toMatchObject({
@@ -2239,6 +2243,7 @@ it("returns another Ultimate's answer as a reply once, and refuses a reply to a 
   expect(messages.find((m) => m.id === told.message)).toMatchObject({
     to: 'remote',
     state: 'answered',
+    call: 'script-1/tell',
     remote: { project: 'poe2-rust', id: 41, key },
   })
   // The reply expects none: @ultimate's answer to it goes nowhere, so two Ultimates cannot loop.

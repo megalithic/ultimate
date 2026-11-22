@@ -202,6 +202,7 @@ function globals(
   conversationId: ConversationId,
   context: Context,
   record?: (name: string, args: unknown[]) => (status: string) => void,
+  callId?: string,
 ): CodemodeTool[] {
   const reads = localReads(host, context)
   const remoteMachine = (machine: unknown) => {
@@ -346,6 +347,7 @@ function globals(
             text,
             ...(reply === undefined ? {} : { reply }),
             ...(machine ? { machine } : {}),
+            ...(callId === undefined ? {} : { call: `${callId}/tell` }),
           },
           withAbortSignal(signal, context),
         )
@@ -595,7 +597,7 @@ export default function codemode(host: ExtensionHost) {
         const saved = await api.snapshot(Store, api.conversationId, context)
         const sandbox = new CodemodeSandbox({
           tools,
-          globals: globals(host, api.conversationId, sandboxContext, record),
+          globals: globals(host, api.conversationId, sandboxContext, record, api.callId),
           timeoutMs: parsed.options.timeoutMs ?? 60000,
           memoryLimitBytes: 256 * 1024 * 1024,
         })

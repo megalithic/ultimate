@@ -129,18 +129,26 @@ export const ultimateCompact = (
   standing: Readonly<Record<string, unknown>> | null | undefined,
 ) => standing?.ultimate === conversation.id
 
-export const sentBy = (messages: readonly Message[], call: string) =>
+const madeBy = (to: Message['to'], messages: readonly Message[], call: string) =>
   messages.filter(
     (message) =>
-      message.to === 'user' &&
+      message.to === to &&
       message.call !== undefined &&
       (message.call === call || message.call.startsWith(`${call}/`)),
   )
 
+export const sentBy = (messages: readonly Message[], call: string) => madeBy('user', messages, call)
+
+export const toldBy = (messages: readonly Message[], call: string) =>
+  madeBy('remote', messages, call)
+
 export const scriptMessaged = (
   call: { id: string; name: string },
   log: Readonly<MessagesData> | null | undefined,
-) => call.name === 'codemode' && sentBy(log?.messages ?? [], call.id).length > 0
+) =>
+  call.name === 'codemode' &&
+  (sentBy(log?.messages ?? [], call.id).length > 0 ||
+    toldBy(log?.messages ?? [], call.id).length > 0)
 
 const hiddenUncountedCompactKinds = new Set([
   'board.wake',

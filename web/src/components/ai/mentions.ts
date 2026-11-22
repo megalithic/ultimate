@@ -2,15 +2,17 @@ import { parseConversationId, parseEntryId } from '../../../../lib/ids.ts'
 export const mentionPattern = /(?<![\w/#&])#(\d{3,})(?:\/(\d+))?(?![\w/])/g
 const quantity =
   ' ?(?:%|percent|times|more|of|ms|s|secs?|seconds?|mins?|minutes?|h|hrs?|hours?|days?|weeks?|months?|years?|px|mm|cm|m|inch(?:es)?|ft|feet)\\b'
+const name = '[\\w-](?:[\\w.-]*[\\w-])?'
 const globalMessageIdMention = new RegExp(
-  `(?<![\\w/#&-])(?:[Mm]essage|[Cc]ard) (\\d+)(?![\\w/]|\\.\\d|${quantity})`,
+  `(?<![\\w/#&-])(?:[Mm]essage|[Cc]ard) (\\d+)(?:@([A-Za-z_.](?:[\\w.-]*[\\w-])?)(?::(${name}))?)?(?![\\w/@]|\\.\\d|${quantity})`,
   'g',
 )
 const anyMention = new RegExp(`${mentionPattern.source}|${globalMessageIdMention.source}`, 'g')
 
 export const mentionHref = (conversation: string, entry?: string) =>
   `#conversation-${conversation}${entry ? `-${entry}` : ''}`
-export const messageHref = (message: string) => `#message-${message}`
+export const messageHref = (message: string, project?: string, machine?: string) =>
+  `#message-${message}${project ? `@${project}${machine ? `:${machine}` : ''}` : ''}`
 
 export function parseMention(href: string) {
   const match = /^#conversation-(\d+)(?:-(\d+))?$/.exec(href)
@@ -28,9 +30,17 @@ export function parseMessageMention(href: string) {
   return Number.isSafeInteger(id) ? id : undefined
 }
 
+export function parseRemoteMessageMention(href: string) {
+  const match = new RegExp(`^#message-(\\d+)@([^:@]+)(?::(${name}))?$`).exec(href)
+  const message = match ? Number(match[1]) : NaN
+  return match && Number.isSafeInteger(message)
+    ? { message, project: match[2], ...(match[3] ? { machine: match[3] } : {}) }
+    : undefined
+}
+
 type Mention = { text: string; href: string } & (
   | { conversation: string; entry?: string }
-  | { message: string }
+  | { message: string; project?: string; machine?: string }
 )
 
 export function splitMentions(text: string) {
@@ -46,7 +56,13 @@ export function splitMentions(text: string) {
             text: match[0],
             href: mentionHref(match[1], match[2]),
           }
-        : { message: match[3], text: match[0], href: messageHref(match[3]) },
+        : {
+            message: match[3],
+            ...(match[4] ? { project: match[4] } : {}),
+            ...(match[5] ? { machine: match[5] } : {}),
+            text: match[0],
+            href: messageHref(match[3], match[4], match[5]),
+          },
     )
     last = match.index + match[0].length
   }

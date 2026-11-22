@@ -58,7 +58,9 @@ import {
   remoteLabel,
   sentBy,
   sentStatus,
+  toldBy,
 } from './data.tsx'
+import { openElsewhere } from './elsewhere.tsx'
 import { cacheBusts } from '../../lib/context-usage.ts'
 import { imagesOf } from '../../lib/entries.ts'
 import { callerOf } from './caller.ts'
@@ -512,6 +514,53 @@ export function MessageCall({ call, core }: { call: ToolCallView; core: ReactNod
   )
 }
 
+export function OpenElsewhere({ remote }: { remote: Remote }) {
+  if (remote.id === undefined) return null
+  return (
+    <button
+      className="ml-auto flex cursor-pointer items-center gap-1 hover:text-foreground"
+      data-open-elsewhere={remote.id}
+      onClick={() =>
+        void openElsewhere({
+          message: remote.id!,
+          project: remote.project,
+          machine: remote.machine,
+        })
+      }
+      title={`Open message ${remote.id} in ${remoteLabel(remote)}`}
+      type="button"
+    >
+      <SquareArrowOutUpRightIcon className="size-3" />
+      open in {remote.project}
+    </button>
+  )
+}
+
+function TellCard({ message }: { message: Message }) {
+  const state = outgoingState(message, false, false)
+  return (
+    <Card data-message-outgoing={message.id}>
+      <header className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2 font-mono text-[11px] text-muted-foreground">
+        <SendIcon className="size-3.5 text-brand" />
+        <span>Message to</span>
+        <span className="flex min-w-0 text-foreground">
+          <Address id="remote" remote={message.remote} />
+        </span>
+        <span>{message.reply ? 'expects reply' : 'one-way'}</span>
+        {state && <span className={state === 'failed' ? 'text-destructive' : ''}>· {state}</span>}
+        {message.remote && <OpenElsewhere remote={message.remote} />}
+      </header>
+      {message.error && (
+        <p className="border-b border-border/60 px-3 py-1.5 font-mono text-[11px] break-words text-destructive">
+          {message.error}
+        </p>
+      )}
+      <Body text={message.text} />
+      <Answers message={message} />
+    </Card>
+  )
+}
+
 export function BranchCall({ call, core }: { call: ToolCallView; core: ReactNode }) {
   const log = useDocOf(ROOT, MessagesDoc)
   const { switchConversation, showSurface } = useUltimate()
@@ -798,22 +847,25 @@ function ScriptMessages({
   shown: readonly { id: string; name: string }[]
 }) {
   const log = useDocOf(ROOT, MessagesDoc) ?? emptyMessages
-  const sent = shown.flatMap((block) =>
-    block.name === 'codemode' ? sentBy(log.messages, block.id) : [],
-  )
-  if (!sent.length) return core
-  const bubbles = sent.map((message) => (
-    <Bubble
-      entry={entry}
-      from={entry.conversationId}
-      key={message.id}
-      message={message}
-      running={false}
-      text={message.text}
-    >
-      <Answers message={message} />
-    </Bubble>
-  ))
+  const scripts = shown.filter((block) => block.name === 'codemode')
+  const sent = scripts.flatMap((block) => sentBy(log.messages, block.id))
+  const told = scripts.flatMap((block) => toldBy(log.messages, block.id))
+  if (!sent.length && !told.length) return core
+  const bubbles = [
+    ...told.map((message) => <TellCard key={message.id} message={message} />),
+    ...sent.map((message) => (
+      <Bubble
+        entry={entry}
+        from={entry.conversationId}
+        key={message.id}
+        message={message}
+        running={false}
+        text={message.text}
+      >
+        <Answers message={message} />
+      </Bubble>
+    )),
+  ]
   if (shown.some((block) => block.name !== 'codemode'))
     return (
       <div className="flex min-w-0 flex-col gap-3">

@@ -1,7 +1,7 @@
 import type { EntryRecord, EntryId, ConversationId } from '@earendil-works/pi-durable'
 import { describe, expect, it, vi } from 'vitest'
 import { accentOf } from '../../accent.tsx'
-import { callerOf } from '../../caller.ts'
+import { callerOf, cardOf } from '../../caller.ts'
 import {
   answersTo,
   answeredMessages,
@@ -21,6 +21,7 @@ import {
   sentBy,
   sentStatus,
   threadRow,
+  toldBy,
   ultimateCompact,
   waitingOnUser,
 } from '../../data.tsx'
@@ -28,6 +29,27 @@ import type { Message } from '../../refs.ts'
 import { questionsOf } from '../../waiting.tsx'
 
 vi.mock('@/sdk', () => ({ events: { emit: vi.fn<() => void>() } }))
+const { openableUrl } = await import('../../elsewhere.tsx')
+
+it('opens another instance at its loopback address from loopback, else at its own tailnet address', () => {
+  const swifties = {
+    url: 'http://127.0.0.1:4747',
+    label: 'swifties on this machine',
+    name: 'swifties',
+    tailnet: 'https://workbookpro.tail0d7fe7.ts.net:4747',
+  }
+  expect(openableUrl(swifties, new URL('http://127.0.0.1:4749/'))).toBe(swifties.url)
+  expect(openableUrl(swifties, new URL('http://localhost:4749/'))).toBe(swifties.url)
+  const phone = new URL('https://workbookpro.tail0d7fe7.ts.net:4749/')
+  expect(openableUrl(swifties, phone)).toBe(swifties.tailnet)
+  expect(openableUrl({ ...swifties, tailnet: undefined }, phone)).toBeUndefined()
+  const remote = {
+    ...swifties,
+    url: 'https://megabookpro.tail0d7fe7.ts.net:4749',
+    tailnet: undefined,
+  }
+  expect(openableUrl(remote, phone)).toBe(remote.url)
+})
 vi.mock('../../../lineage/ui.tsx', async () => import('../../../lineage/refs.ts'))
 vi.mock('../../../workspaces/ui.tsx', async () => import('../../../workspaces/refs.ts'))
 vi.mock('../../../subagents/ui.tsx', async () => import('../../../subagents/refs.ts'))
@@ -438,6 +460,22 @@ describe('messages a codemode script sent', () => {
     ])
     expect(sentBy(log, 'b').map((m) => [m.id, messageStatus(m)])).toEqual([[2, 'yours']])
     expect(sentBy(log, 'c')).toEqual([])
+  })
+  it("shows a script's tells as cards that a message link reveals", () => {
+    const tell: Message = {
+      ...base,
+      id: 9,
+      to: 'remote',
+      state: 'delivered',
+      call: 'd/tell',
+      remote: { project: 'swifties', machine: 'm', key: 'k', id: 501 },
+    }
+    expect(toldBy([...log, tell], 'd')).toEqual([tell])
+    expect(sentBy([...log, tell], 'd')).toEqual([])
+    expect(scriptMessaged(script('d'), { messages: [tell], next: 10 })).toBe(true)
+    expect(cardOf(tell)).toEqual({ conversation: tell.from, call: 'd/tell' })
+    const { call: _, ...beforeTellsRecordedTheirCall } = tell
+    expect(cardOf(beforeTellsRecordedTheirCall)).toBeUndefined()
   })
   it('keeps a script visible from the log alone, with or without a result', () => {
     expect(scriptMessaged(script('b'), { messages: log, next: 8 })).toBe(true)
