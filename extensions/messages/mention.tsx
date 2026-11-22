@@ -6,7 +6,7 @@ import { openElsewhere } from './elsewhere.tsx'
 import { MessagesDoc } from './refs.ts'
 
 const chip =
-  'mx-px rounded-sm px-0.5 font-mono text-[0.92em] text-foreground underline decoration-muted-foreground/40 decoration-dotted underline-offset-2 transition-colors hover:bg-accent'
+  'mx-px rounded-sm px-0.5 font-mono text-[0.92em] text-foreground underline decoration-muted-foreground/40 decoration-dotted underline-offset-2 transition-colors outline-none hover:bg-accent focus-visible:bg-accent'
 
 export function MessageMentionLink({
   href,
