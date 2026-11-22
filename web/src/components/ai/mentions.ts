@@ -4,7 +4,7 @@ const quantity =
   ' ?(?:%|percent|times|more|of|ms|s|secs?|seconds?|mins?|minutes?|h|hrs?|hours?|days?|weeks?|months?|years?|px|mm|cm|m|inch(?:es)?|ft|feet)\\b'
 const name = '[\\w-](?:[\\w.-]*[\\w-])?'
 const globalMessageIdMention = new RegExp(
-  `(?<![\\w/#&-])(?:[Mm]essage|[Cc]ard) (\\d+)(?:@([A-Za-z_.](?:[\\w.-]*[\\w-])?)(?::(${name}))?)?(?![\\w/@]|\\.\\d|${quantity})`,
+  `(?<![\\w/#&-])(?:[Mm]essage|[Cc]ard) (\\d+)(?:@([A-Za-z_.](?:[\\w.-]*[\\w-])?)(?::(${name}))?)?(?![\\w/@]|[.:]\\w|${quantity})`,
   'g',
 )
 const anyMention = new RegExp(`${mentionPattern.source}|${globalMessageIdMention.source}`, 'g')

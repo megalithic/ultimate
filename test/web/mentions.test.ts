@@ -124,22 +124,30 @@ it('links message and card ids in prose, which name a card by its global id alon
 
 it('links a message on another project, optionally on a named machine', () => {
   const parts = splitMentions(
-    "sent to swifties (message 501@swifties), mega's message 7@.dotfiles:megabookpro.",
+    "sent to swifties (message 501@swifties), the laptop's message 7@.dotfiles:laptop.",
   ).filter((part) => typeof part !== 'string')
   expect(parts.map((part) => [part.text, part.href])).toEqual([
     ['message 501@swifties', '#message-501@swifties'],
-    ['message 7@.dotfiles:megabookpro', '#message-7@.dotfiles:megabookpro'],
+    ['message 7@.dotfiles:laptop', '#message-7@.dotfiles:laptop'],
   ])
   expect(parseRemoteMessageMention('#message-501@swifties')).toEqual({
     message: 501,
     project: 'swifties',
   })
-  expect(parseRemoteMessageMention('#message-7@.dotfiles:megabookpro')).toEqual({
+  expect(parseRemoteMessageMention('#message-7@.dotfiles:laptop')).toEqual({
     message: 7,
     project: '.dotfiles',
-    machine: 'megabookpro',
+    machine: 'laptop',
   })
   expect(parseMessageMention('#message-501@swifties')).toBeUndefined()
   expect(parseRemoteMessageMention('#message-501')).toBeUndefined()
-  expect(mentions('message 5@3pm, message 5@ noon, card 2@x@y')).toEqual([])
+  expect(
+    mentions(
+      'message 5@3pm, message 5@ noon, card 2@x@y, card 2@x.y@z, message 5@app:host/notes, message 5@a:b:c',
+    ),
+  ).toEqual([])
+  expect(mentions('see message 706: done. Then message 8@app.')).toEqual([
+    'message 706',
+    'message 8@app',
+  ])
 })

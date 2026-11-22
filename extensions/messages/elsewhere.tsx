@@ -29,11 +29,6 @@ export async function openElsewhere(target: {
   project: string
   machine?: string
 }) {
-  const name = `ultimate:${target.project}:${target.machine ?? ''}`
-  const openedInTheClickSoPopupBlockersAllowIt = window.open('', name)
-  const tab = openedInTheClickSoPopupBlockersAllowIt
-  const fresh = tab ? blank(tab) : false
-  if (tab && fresh) tab.opener = null
   const foundOnlyAmongKnownInstancesNeverFromTheLink = await api
     .action(InstanceAction, {
       project: target.project,
@@ -41,27 +36,21 @@ export async function openElsewhere(target: {
     })
     .catch((error: unknown) => ({ error: error instanceof Error ? error.message : String(error) }))
   const found = foundOnlyAmongKnownInstancesNeverFromTheLink
-  const giveUp = () => {
-    if (tab && fresh) tab.close()
-  }
-  if ('error' in found) {
-    giveUp()
-    await notify(found.error)
-    return
-  }
+  if ('error' in found) return notify(found.error)
   if ('current' in found) {
-    giveUp()
     events.emit('messages:open', { message: target.message })
     return
   }
   const base = openableUrl(found, new URL(location.href))
-  if (!base) {
-    giveUp()
-    await notify(`${found.label} has no tailnet address, so its messages open only on that machine`)
-    return
-  }
+  if (!base)
+    return notify(
+      `${found.label} has no tailnet address, so its messages open only on that machine`,
+    )
   const url = new URL(base)
   url.searchParams.set('message', String(target.message))
-  if (tab) tab.location.href = url.href
-  else window.open(url.href, name)
+  const oneTabPerResolvedInstance = `ultimate:${url.origin}`
+  const tab = window.open('', oneTabPerResolvedInstance)
+  if (!tab) return notify(`The browser blocked the tab for ${found.label}`)
+  if (blank(tab)) tab.opener = null
+  tab.location.href = url.href
 }

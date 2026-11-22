@@ -36,16 +36,16 @@ it('opens another instance at its loopback address from loopback, else at its ow
     url: 'http://127.0.0.1:4747',
     label: 'swifties on this machine',
     name: 'swifties',
-    tailnet: 'https://workbookpro.tail0d7fe7.ts.net:4747',
+    tailnet: 'https://desk.example.ts.net:4747',
   }
   expect(openableUrl(swifties, new URL('http://127.0.0.1:4749/'))).toBe(swifties.url)
   expect(openableUrl(swifties, new URL('http://localhost:4749/'))).toBe(swifties.url)
-  const phone = new URL('https://workbookpro.tail0d7fe7.ts.net:4749/')
+  const phone = new URL('https://desk.example.ts.net:4749/')
   expect(openableUrl(swifties, phone)).toBe(swifties.tailnet)
   expect(openableUrl({ ...swifties, tailnet: undefined }, phone)).toBeUndefined()
   const remote = {
     ...swifties,
-    url: 'https://megabookpro.tail0d7fe7.ts.net:4749',
+    url: 'https://laptop.example.ts.net:4749',
     tailnet: undefined,
   }
   expect(openableUrl(remote, phone)).toBe(remote.url)
