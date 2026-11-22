@@ -113,7 +113,9 @@ it('reads closed chapter records exactly like live fork-aware history, with titl
     expect(listing).toContainEqual(expect.objectContaining({ id: parent.id, title: 'After' }))
     expect(await read('conversations', [{ chapter: 'next' }])).toEqual(listing)
     expect(await readFile(database)).toEqual(bytes)
-    await expect(read('entries', [fork.id])).rejects.toThrow('Unknown conversation')
+    await expect(read('entries', [fork.id])).rejects.toThrow(
+      `Unknown conversation ${fork.id} in the open chapter ${FIRST_CHAPTER}; read another chapter's history with { chapter: '<name>' } on entries, search or conversations`,
+    )
     await expect(read('entries', [fork.id, { chapter: 'next', limit: 0 }])).rejects.toThrow(
       'limit must be',
     )

@@ -1,4 +1,5 @@
 import { parseConversationId } from '../../lib/ids.ts'
+import { unknownInChapter } from '../../lib/chapters.ts'
 import type { ConversationId, Cursor, Tx } from '@earendil-works/pi-durable'
 import { join } from 'node:path'
 import type { Context } from '@earendil-works/chord/context'
@@ -92,7 +93,7 @@ async function topLevelId(host: ExtensionHost, args: ActionInput<{ id: number }>
     throw new Error('Expected a conversation id')
   const id = parseConversationId(value)
   const found = await record(host, id, context)
-  if (!found) throw new Error(`Unknown conversation ${id}`)
+  if (!found) throw new Error(unknownInChapter(id, host.chapter.name, false))
   if (found.owner) throw new Error(`Conversation ${id} is owned, not a top-level conversation`)
   return id
 }
@@ -221,14 +222,14 @@ async function ownedTree(tx: Tx, ids: ConversationId[]) {
   return tree
 }
 export async function concludeIn(
-  host: Pick<ExtensionHost, 'doc' | 'emit'>,
+  host: Pick<ExtensionHost, 'doc' | 'emit' | 'chapter'>,
   tx: Tx,
   ids: ConversationId[],
   by: ConversationId | 'landing' | 'user',
 ) {
   for (const id of ids) {
     const found = await tx.conversation(id)
-    if (!found) throw new Error(`Unknown conversation ${id}`)
+    if (!found) throw new Error(unknownInChapter(id, host.chapter.name, false))
     if (found.owner) throw new Error(`Conversation ${id} is owned, not a top-level conversation`)
     await refuseFixed(host, tx, id, 'concluded')
   }
@@ -263,17 +264,17 @@ function conversationIds(args: ActionInput<{ ids: number[] }>): ConversationId[]
 }
 
 function resume(host: ExtensionHost, ids: ConversationId[]) {
-  return host.harness().commit((tx) => resumeWithAncestorsIn(tx, ids), context)
+  return host.harness().commit((tx) => resumeWithAncestorsIn(tx, ids, host.chapter.name), context)
 }
 
-async function resumeWithAncestorsIn(tx: Tx, ids: ConversationId[]) {
+async function resumeWithAncestorsIn(tx: Tx, ids: ConversationId[], chapter: string) {
   const ancestors = new Set<ConversationId>()
   for (const id of ids) {
     let current: ConversationId | undefined = id
     while (current !== undefined && !ancestors.has(current)) {
       ancestors.add(current)
       const found = await tx.conversation(current)
-      if (!found) throw new Error(`Unknown conversation ${current}`)
+      if (!found) throw new Error(unknownInChapter(current, chapter, false))
       current = found.owner?.conversationId ?? found.parent?.conversationId
     }
   }
@@ -353,7 +354,7 @@ export default (host: ExtensionHost) => {
       hook(GenerationTask, {
         beforeInput: async (_input, api) => {
           if (!(await isSideChat(host, api.tx, api.conversationId)))
-            await resumeWithAncestorsIn(api.tx, [api.conversationId])
+            await resumeWithAncestorsIn(api.tx, [api.conversationId], host.chapter.name)
           return identityNoteOncePerContextHead(api.tx, api.conversationId)
         },
         beforeRequest: (request, api) => {

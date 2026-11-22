@@ -42,6 +42,14 @@ it('adds to-dos by owner and refuses empty text or an unknown owner', async () =
   expect((await list(tx)).map((todo) => todo.id)).toEqual([1, 2])
 })
 
+it('states the text limit in the todo tool schema', () => {
+  const tool = todosExtension({ implement() {} } as unknown as ExtensionHost).tools!.find(
+    (item) => item.name === 'todo',
+  )!
+  const text = (tool.parameters as { properties: Record<string, object> }).properties.text
+  expect(text).toMatchObject({ description: expect.stringContaining('at most 300 characters') })
+})
+
 it('adds through TodosApi once per key, even after the to-do left the list', async () => {
   const { tx } = fakeTx()
   let service: TodosService | undefined

@@ -42,6 +42,7 @@ import { REMOTE_BYTES } from '../../lib/remote.ts'
 import type { Read } from './projects.ts'
 import { closedChapter, compactEntry, id, limit, readChapter, searchHit } from './chapters.ts'
 import type { EntriesOptions, HistoryRead, SearchOptions } from './chapters.ts'
+import { unknownInChapter } from '../../lib/chapters.ts'
 import { ConversationsApi } from '../conversations/api.ts'
 import { MessagesApi } from '../messages/api.ts'
 import type { ResponseReceipt } from '../conversations/summary.ts'
@@ -99,8 +100,9 @@ function localReads(host: ExtensionHost, context: Context) {
       return items
     }, context)
   const entries = async (conversation: unknown, options: EntriesOptions = {}) => {
-    const found = await host.harness().conversation(id(conversation), context)
-    if (!found) throw new Error('Unknown conversation')
+    const wanted = id(conversation)
+    const found = await host.harness().conversation(wanted, context)
+    if (!found) throw new Error(unknownInChapter(wanted, host.chapter.name))
     const items: unknown[] = []
     let cursor: Cursor | undefined
     const count = limit(options.limit)
@@ -136,7 +138,7 @@ function localReads(host: ExtensionHost, context: Context) {
       let cursor: Cursor | undefined
       do {
         const found = await host.harness().conversation(conversation.id, context)
-        if (!found) throw new Error('Unknown conversation')
+        if (!found) throw new Error(unknownInChapter(conversation.id, host.chapter.name))
         const page = await found.entries({}, 100, cursor, context)
         for (const entry of page.items) {
           const hit = searchHit(entry, text, options)

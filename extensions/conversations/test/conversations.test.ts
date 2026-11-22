@@ -478,7 +478,11 @@ it('renames top-level conversations', async () => {
     ['rename', null, 'Expected a conversation id'],
     ['rename', { id: 'one', title: 'x' }, 'Expected a conversation id'],
     ['rename', { id }, 'Expected a title'],
-    ['rename', { id: 999999, title: 'x' }, 'Unknown conversation 999999'],
+    [
+      'rename',
+      { id: 999999, title: 'x' },
+      'Unknown conversation 999999 in the open chapter the-beginning; conversations in other chapters are read-only and cannot be changed from this one',
+    ],
     ['rename', { id: child.id, title: 'x' }, owned],
     ['conclude', { ids: [child.id] }, owned],
   ] as const)
@@ -661,7 +665,10 @@ it('conclude merges concurrent additions, deduplicates ids and returns kept chec
   const rejected = await create()
   expect(await action('conclude', { ids: [rejected, 999999] })).toEqual({
     status: 500,
-    data: { error: 'Unknown conversation 999999' },
+    data: {
+      error:
+        'Unknown conversation 999999 in the open chapter the-beginning; conversations in other chapters are read-only and cannot be changed from this one',
+    },
   })
   expect((await server.host.uiState(context))['ext.conversations.concluded']).toEqual([
     first,

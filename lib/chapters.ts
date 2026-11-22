@@ -28,6 +28,13 @@ export function chapterName(value: unknown) {
   return value
 }
 
+export const unknownInChapter = (id: number, chapter: string, read = true) =>
+  `Unknown conversation ${id} in the open chapter ${chapter}; ${
+    read
+      ? "read another chapter's history with { chapter: '<name>' } on entries, search or conversations"
+      : 'conversations in other chapters are read-only and cannot be changed from this one'
+  }`
+
 export const readChapters = (home: string) =>
   readJson<Chapters>(join(home, CHAPTERS_FILE), {
     active: FIRST_CHAPTER,
