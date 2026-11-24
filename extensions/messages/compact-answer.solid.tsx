@@ -10,8 +10,9 @@ import {
 import { ROOT, useCompact, useConversationId, useDocOf } from '@/sdk/solid'
 import { Bubble } from './bubble.solid.tsx'
 import { Answers } from './card-parts.solid.tsx'
-import { answeredMessages, sentBy } from './data.ts'
+import { answeredMessages, sentBy, toldBy } from './data.ts'
 import { MessagesDoc } from './refs.ts'
+import { TellCard } from './tell.solid.tsx'
 import { Address } from './ui.solid.tsx'
 
 export const HiddenEntry = () => null
@@ -62,8 +63,13 @@ function ScriptMessages(props: {
       block.name === 'codemode' ? sentBy(log()?.messages ?? [], block.id) : [],
     ),
   )
+  const told = createMemo(() =>
+    props.shown.flatMap((block) =>
+      block.name === 'codemode' ? toldBy(log()?.messages ?? [], block.id) : [],
+    ),
+  )
   return (
-    <Show fallback={props.core} when={sent().length}>
+    <Show fallback={props.core} when={sent().length || told().length}>
       <div class="flex min-w-0 flex-col gap-3">
         <Show fallback={props.core} when={props.shown.every((block) => block.name === 'codemode')}>
           <Collapsible class="group/script">
@@ -77,6 +83,9 @@ function ScriptMessages(props: {
             <CollapsibleContent class="mt-3">{props.core}</CollapsibleContent>
           </Collapsible>
         </Show>
+        <For each={told()} keyed={(item) => item.id}>
+          {(message) => <TellCard message={message()} />}
+        </For>
         <For each={sent()} keyed={(item) => item.id}>
           {(message) => (
             <Bubble

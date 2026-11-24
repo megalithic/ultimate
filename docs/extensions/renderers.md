@@ -55,7 +55,10 @@ Link renderers compose in discovery order, with `core` as the fallback. Return `
 code and links) into `#conversation-<id>[-<entry>]` links, and `message <id>` or `card <id>` into `#message-<id>` links
 (`message <id>@<project>[:<machine>]` into `#message-<id>@<project>[:<machine>]`, a message on another project's Ultimate).
 `MentionText` does the same for plain text. `conversations` renders those of known conversations as their feature chip,
-others stay text; `messages` renders message links that open and highlight the card.
+others stay text; `messages` renders message links that open and highlight the card, including a card sent from codemode.
+Quantities such as `message 5 seconds` stay text. Dotted project mentions stay message links, not GFM email links;
+ordinary emails and explicit Markdown links are unchanged. Cross-project links resolve a known instance before opening
+a tab, reused by its resolved origin; a remote viewer uses that instance's tailnet address rather than its loopback.
 
 ```tsx
 export const DocsLink: LinkRenderer = (props) => (

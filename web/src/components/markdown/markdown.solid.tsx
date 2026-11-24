@@ -40,7 +40,12 @@ import {
   parse,
 } from './parse.ts'
 import type { Element, ElementContent } from './parse.ts'
-import { mentionHref, parseMention, splitMentions } from '../ai/mentions.ts'
+import {
+  parseMention,
+  parseMessageMention,
+  parseRemoteMessageMention,
+  splitMentions,
+} from '../ai/mentions.ts'
 
 type Rendered = { extension: string; version: number; component: Component<never> }
 
@@ -94,7 +99,9 @@ function Anchor(props: {
 }) {
   const renderers = createMemo(() => linkRenderers(useExtensions()()) as Rendered[])
   const core = () =>
-    parseMention(props.href) ? (
+    parseMention(props.href) ||
+    parseMessageMention(props.href) !== undefined ||
+    parseRemoteMessageMention(props.href) ? (
       props.children
     ) : (
       <ConfirmedLink
@@ -493,7 +500,7 @@ function Part(props: { part: string | Mention }) {
   return (
     <Show when={mention()} fallback={<>{props.part as string}</>}>
       {(link) => (
-        <Anchor attributes={{}} href={mentionHref(link().conversation, link().entry)}>
+        <Anchor attributes={{}} href={link().href}>
           {link().text}
         </Anchor>
       )}

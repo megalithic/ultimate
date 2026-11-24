@@ -3,6 +3,7 @@ import { CompactAnswer, MessageAnswerLabel, HiddenEntry } from './compact-answer
 import { scriptMessaged, threadRow, ultimateCompact } from './data.ts'
 import { JudgedAnswerLabel } from './judged.solid.tsx'
 import { MessageInput } from './message-input.solid.tsx'
+import { MessageMentionLink } from './mention.solid.tsx'
 import { StretchSummary } from './stretch-summary.solid.tsx'
 import { BranchCall, MessageCall } from './tool-cards.solid.tsx'
 import { MessageNavigation } from './navigation.solid.tsx'
@@ -17,6 +18,7 @@ const input = MessageInput
 const hidden = HiddenEntry
 
 export default defineWebExtension({
+  link: MessageMentionLink,
   slots: {
     overlay: [MessageNavigation],
     'composer.status': [OpenMessages],

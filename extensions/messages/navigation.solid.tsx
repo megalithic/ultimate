@@ -4,30 +4,36 @@ import {
   api,
   events,
   keepLast,
+  notify,
   ROOT,
   showSurface,
+  switchConversation,
   useConversation,
   useDocOf,
   useEvent,
   useReady,
   useStore,
 } from '@/sdk/solid'
-import { parseConversationId } from '../../lib/ids.ts'
-import { callerOf } from './caller.ts'
-import { openQuestion } from './data.ts'
+import { callerOf, cardOf } from './caller.ts'
 import { CallerAction, MessagesDoc } from './refs.ts'
 
-type Target = { conversation: ConversationId; entry?: number; call?: string; message?: number }
+type Target =
+  | { message: number }
+  | {
+      conversation: ConversationId
+      entry?: number
+      call?: string
+      card?: number
+      highlight?: boolean
+    }
 
 function fromAddress(): Target | undefined {
   const url = new URL(location.href)
   if (!url.searchParams.has('message')) return undefined
   const message = Number(url.searchParams.get('message'))
-  const conversation = parseConversationId(Number(url.searchParams.get('conversation')))
   url.searchParams.delete('message')
   history.replaceState(history.state, '', url)
-  if (Number.isSafeInteger(message) && Number.isSafeInteger(conversation) && conversation > 0)
-    return { conversation, message }
+  if (Number.isSafeInteger(message)) return { message }
   return undefined
 }
 
@@ -46,27 +52,31 @@ export function MessageNavigation() {
   createEffect(
     () => {
       const wanted = target()
-      if (wanted?.message === undefined) return undefined
+      if (!wanted || !('message' in wanted)) return undefined
       const messages = log()?.messages
       if (!messages) return undefined
-      const asked = messages.find((m) => m.id === wanted.message)
-      const call =
-        asked?.from === wanted.conversation && openQuestion(asked) ? asked.call : undefined
-      return { conversation: wanted.conversation, call }
+      return {
+        message: wanted.message,
+        place: cardOf(messages.find((m) => m.id === wanted.message)),
+      }
     },
     (resolved) => {
       if (!resolved) return
-      if (resolved.call) {
-        showSurface('agent')
-        setTarget(resolved)
-      } else setTarget(undefined)
+      if (!resolved.place) {
+        notify({ level: 'info', message: `Message ${resolved.message} not found` })
+        setTarget(undefined)
+        return
+      }
+      showSurface('agent')
+      switchConversation(resolved.place.conversation)
+      setTarget({ ...resolved.place, card: resolved.message, highlight: true })
     },
   )
 
   createEffect(
     () => {
       const wanted = target()
-      if (!wanted || wanted.message !== undefined || !ready().ready || surface() !== 'agent')
+      if (!wanted || 'message' in wanted || !ready().ready || surface() !== 'agent')
         return undefined
       const { id, entries, loading } = current()
       if (id !== wanted.conversation || loading) return undefined
@@ -76,9 +86,15 @@ export function MessageNavigation() {
     },
     (wanted) => {
       if (!wanted) return undefined
-      const { conversation, call, toolCallId, entry } = wanted
+      const { conversation, call, toolCallId, entry, card, highlight } = wanted
       const reveal = (entryId: number) =>
-        events.emit('ultimate:reveal-entry', { conversationId: conversation, entryId, toolCallId })
+        events.emit('ultimate:reveal-entry', {
+          conversationId: conversation,
+          entryId,
+          toolCallId,
+          selector: card === undefined ? undefined : `[data-message-outgoing="${card}"]`,
+          highlight,
+        })
       if (entry !== undefined) {
         const frame = requestAnimationFrame(() => {
           setTarget(undefined)

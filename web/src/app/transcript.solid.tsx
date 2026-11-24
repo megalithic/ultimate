@@ -422,14 +422,30 @@ function TranscriptView(props: {
     }
   })
 
-  const [reveal, setReveal] = createSignal<{ entry: EntryId; call?: string }>()
+  const [reveal, setReveal] = createSignal<{
+    entry: EntryId
+    call?: string
+    selector?: string
+    highlight?: boolean
+  }>()
   useEvent('ultimate:reveal-entry', (value) => {
     const target = value as
-      | { conversationId?: ConversationId; entryId?: EntryId; toolCallId?: string }
+      | {
+          conversationId?: ConversationId
+          entryId?: EntryId
+          toolCallId?: string
+          selector?: string
+          highlight?: boolean
+        }
       | undefined
     const entryId = target?.entryId
     if (target?.conversationId === id && entryId !== undefined && Number.isSafeInteger(entryId))
-      setReveal({ entry: entryId, call: target?.toolCallId })
+      setReveal({
+        entry: entryId,
+        call: target?.toolCallId,
+        selector: target?.selector,
+        highlight: target?.highlight,
+      })
   })
   createEffect(
     () => ({
@@ -449,7 +465,7 @@ function TranscriptView(props: {
         setReveal(undefined)
         return
       }
-      const { entry: revealed, call } = target
+      const { entry: revealed, call, selector, highlight } = target
       if (!entries.some((entry) => entry.id === revealed)) {
         const cursor = history.cursor()
         if (cursor !== undefined && revealed < cursor) {
@@ -481,17 +497,29 @@ function TranscriptView(props: {
         return
       }
       const row = `[data-entry-id="${revealed}"]`
-      const block =
-        call === undefined
-          ? undefined
-          : content.querySelector(`${row} [data-tool-call-id="${CSS.escape(call)}"]`)
+      const shown = (found: Element | null | undefined) =>
+        found && found.getBoundingClientRect().height > 0 ? found : undefined
       const element =
-        block && block.getBoundingClientRect().height > 0 ? block : content.querySelector(row)
+        shown(selector === undefined ? undefined : content.querySelector(`${row} ${selector}`)) ??
+        shown(
+          call === undefined
+            ? undefined
+            : content.querySelector(`${row} [data-tool-call-id="${CSS.escape(call)}"]`),
+        ) ??
+        content.querySelector(row)
       if (element) {
         scroller()?.stop()
         held = element
         maxPinnedCover = 0
         hold()
+        if (highlight) {
+          element.removeAttribute('data-revealed')
+          void (element as HTMLElement).offsetWidth
+          element.setAttribute('data-revealed', '')
+          element.addEventListener('animationend', () => element.removeAttribute('data-revealed'), {
+            once: true,
+          })
+        }
       }
       setReveal(undefined)
     },
