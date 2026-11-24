@@ -245,6 +245,30 @@ it('leaves recommendations unchosen on Enter and accepts them with ⇧↵', asyn
   ])
 })
 
+it('leaves Enter on a link in a question to the link', async () => {
+  const linked: Message = {
+    ...message,
+    id: 10,
+    questions: [
+      { text: 'Read [the guide](https://example.com) first?', kind: 'confirm' },
+      { text: 'Land it?', kind: 'confirm' },
+    ],
+  }
+  const card = renderSolid(() => (
+    <MessageQuestions message={linked} keys={true} withActions={false} />
+  ))
+  const current = () =>
+    card.querySelector('[data-question] fieldset[data-current]')?.closest('[data-question]')
+  await vi.advanceTimersByTimeAsync(10)
+  flush()
+  const link = card.querySelector<HTMLElement>('.markdown [data-href]')!
+  link.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  flush()
+  await vi.advanceTimersByTimeAsync(3000)
+  expect(current()?.getAttribute('data-question')).toBe('0')
+  expect(harness.actions).toEqual([])
+})
+
 it('keeps typed drafts without recording them, and records a person picking and sending', async () => {
   const typed: Message = { ...message, id: 8 }
   const card = renderSolid(() => (

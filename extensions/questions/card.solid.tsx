@@ -339,6 +339,7 @@ function AnswerCard(props: CardProps & { id: number }) {
       event.ctrlKey ||
       event.altKey ||
       target?.closest('input, textarea, select, [contenteditable="true"]') ||
+      (event.key === 'Enter' && target?.closest('.markdown :is(a, button)')) ||
       (!root.contains(target) && target?.closest('[data-questions-card], button, a'))
     )
       return

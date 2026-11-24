@@ -286,6 +286,55 @@ it('asks before discarding a draft and can keep editing', async () => {
   expect(composerDraft(82)?.text).toBe('not sent')
 })
 
+it('guards a draft when the pinned question is answered, even though answers use keepalive', async () => {
+  const container = await mountSide()
+  harness.server!.of(82)!.send('doc', {
+    kind: 'sidechat',
+    value: { of: main, at: 40, effects: false, question: 5 },
+  })
+  flush()
+  await settle()
+  harness.server!.of(1)!.send('doc', {
+    kind: 'board',
+    value: {
+      messages: [
+        {
+          id: 5,
+          from: main,
+          to: 'user',
+          reply: true,
+          state: 'delivered',
+          text: 'Land it?',
+          questions: [{ text: 'Land it?', kind: 'confirm' }],
+        },
+      ],
+    },
+  })
+  flush()
+  await settle()
+  container.querySelector<HTMLButtonElement>('[aria-label="Pinned question #5"]')!.click()
+  flush()
+  fillComposer(82, 'still typing')
+  expect(
+    await agent.act({
+      steps: [{ ref: 'Option 1 · Yes · question 1 · message 5', action: 'press' }],
+    }),
+  ).toMatchObject({ ok: true })
+  flush()
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  container
+    .querySelector<HTMLButtonElement>('[aria-label="Summarize & send: answer to message 5"]')!
+    .click()
+  flush()
+  await vi.advanceTimersByTimeAsync(3000)
+  vi.useRealTimers()
+  flush()
+  await settle()
+  expect(container.querySelector('[data-draft-guard]')).not.toBeNull()
+  expect(harness.endings).toEqual([])
+  expect(composerDraft(82)?.text).toBe('still typing')
+})
+
 it('opens an item follow-up with its context and returns to the existing side chat', async () => {
   const container = renderSolid(() => (
     <AskAboutItem

@@ -319,7 +319,7 @@ function SidePane(props: {
                       )
                     },
                   ),
-                { departing: keepalive, onDeparture: 'include' },
+                { onDeparture: 'include' },
               )
             }}
             keys={props.front && !props.phone}
