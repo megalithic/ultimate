@@ -26,7 +26,8 @@ import {
   cn,
   events,
   Fold,
-  formatAgo,
+  formatFullTime,
+  formatStamp,
   formatTokens,
   MessageActions,
   Provided,
@@ -88,6 +89,27 @@ const settledLabel = (dismissal: boolean, answer: Message) =>
     : answer.via
       ? '@ultimate answered for you'
       : 'You answered'
+
+export function Stamp({
+  at,
+  label,
+  className,
+}: {
+  at: number
+  label?: string
+  className?: string
+}) {
+  const now = useNow(60000)
+  return (
+    <time
+      className={cn('shrink-0 tabular-nums', className)}
+      dateTime={new Date(at).toISOString()}
+      title={label ? `${label} ${formatFullTime(at)}` : formatFullTime(at)}
+    >
+      {formatStamp(at, now)}
+    </time>
+  )
+}
 
 export function useAccentOf(id: number | 'user' | 'remote') {
   const standing = useDocOf(ROOT, StandingDoc)
@@ -203,11 +225,11 @@ export function Bubble({
   lead?: ReactNode
   children?: ReactNode
 }) {
-  const now = useNow(60000)
   const log = useDocOf(ROOT, MessagesDoc)
   const accent = useAccentOf(from)
   const status = sentStatus(message, running)
   const stored = entry?.model?.[0]
+  const sent = message ? message.at : entry ? undefined : at
   const answers = message && log ? answersTo(log.messages, message) : []
 
   const bodyAlreadyShowsWriting = running && !message && !text
@@ -229,25 +251,20 @@ export function Bubble({
     >
       <header className="flex h-6 min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
         <Sender id={from} tone={accent.name} />
-        {entry ? (
+        {entry && (
           <MessageActions
             bubble
             className="ml-auto min-w-0 flex-nowrap justify-end overflow-hidden whitespace-nowrap"
             entry={entry}
             text={text ?? ''}
-            timestamp={at ?? (stored && 'timestamp' in stored ? stored.timestamp : 0)}
+            timestamp={
+              sent === undefined
+                ? (at ?? (stored && 'timestamp' in stored ? stored.timestamp : 0))
+                : undefined
+            }
           />
-        ) : (
-          at !== undefined && (
-            <time
-              className="ml-auto shrink-0"
-              dateTime={new Date(at).toISOString()}
-              title={new Date(at).toLocaleString()}
-            >
-              {formatAgo(at, now)}
-            </time>
-          )
         )}
+        {sent !== undefined && <Stamp at={sent} className={entry ? undefined : 'ml-auto'} />}
       </header>
       <div className="[&>div]:px-0 [&>div]:pt-1.5 [&>div]:pb-0">
         {lead}
@@ -308,7 +325,6 @@ function Sender({ id, tone }: { id: ConversationId; tone: string }) {
 }
 
 function AttachedAnswer({ answer, dismissal }: { answer: Message; dismissal: boolean }) {
-  const now = useNow(60000)
   const accent = accentOf('user')
   const { via } = answer
   const { showSurface, switchConversation } = useUltimate()
@@ -333,13 +349,7 @@ function AttachedAnswer({ answer, dismissal }: { answer: Message; dismissal: boo
             from your message
           </button>
         )}
-        <time
-          className="ml-auto"
-          dateTime={new Date(answer.at).toISOString()}
-          title={new Date(answer.at).toLocaleString()}
-        >
-          {formatAgo(answer.at, now)}
-        </time>
+        <Stamp at={answer.at} className="ml-auto" label={dismissal ? 'Dismissed' : 'Answered'} />
       </div>
       {(!dismissal || via) && (
         <UserText

@@ -17,6 +17,8 @@ import {
   defineWebExtension,
   events,
   formatAgo,
+  formatFullTime,
+  formatStamp,
   formatTime,
   Header,
   provide,
@@ -71,9 +73,9 @@ function Waited({ at, now }: { at: number; now: number }) {
         now - at > WAIT_WARNING_AFTER_MS ? amber : 'text-muted-foreground',
       )}
       dateTime={new Date(at).toISOString()}
-      title={`Asked ${new Date(at).toLocaleString()}`}
+      title={`Asked ${formatFullTime(at)}`}
     >
-      {formatAgo(at, now)}
+      {formatStamp(at, now)}
     </time>
   )
 }
@@ -233,7 +235,7 @@ function Reading({
         {conversation !== undefined && <span>·</span>}
         <KindTag entry={entry} />
         <span className="ml-auto flex items-center gap-1">
-          waited <Waited at={entry.at} now={now} />
+          asked <Waited at={entry.at} now={now} />
         </span>
       </header>
       <h2 className="mt-3 text-[17px] leading-7 font-semibold tracking-[-0.01em]">

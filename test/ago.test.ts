@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
 import { formatAgo } from '../lib/ago.ts'
+import { formatStamp, formatTime } from '../web/src/sdk/format.ts'
 
 const minute = 60_000
 const day = 24 * 60 * minute
@@ -33,4 +34,18 @@ it('reads in a sentence with ago, the date fallback unchanged', () => {
     '2d ago',
   ])
   expect(ago(8 * day)).toBe(formatAgo(now - 8 * day, now))
+})
+
+it('stamps a time relatively within the hour, then by local day and clock', () => {
+  const stamp = (at: number) => formatStamp(at, now)
+  expect([stamp(now - 30_000), stamp(now - 12 * minute)]).toEqual(['just now', '12m ago'])
+  expect(stamp(now - 3 * 60 * minute)).toBe(`today ${formatTime(now - 3 * 60 * minute)}`)
+  const yesterday = new Date(2026, 9, 23, 23, 30).getTime()
+  expect(stamp(yesterday)).toBe(`yesterday ${formatTime(yesterday)}`)
+  const older = new Date(2026, 9, 20, 21, 57).getTime()
+  expect(stamp(older)).toBe(
+    `${new Date(older).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${formatTime(older)}`,
+  )
+  const lastYear = new Date(2025, 9, 12, 8, 5).getTime()
+  expect(stamp(lastYear)).toContain('2025')
 })

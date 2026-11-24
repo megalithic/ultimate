@@ -27,6 +27,7 @@ export function formatDuration(ms: number): string {
 
 /** How long ago a time was; in lib/ so server code (model text, range lists) says it the same way. */
 export { formatAgo } from '../../../lib/ago.ts'
+import { formatAgo } from '../../../lib/ago.ts'
 
 /** Show `path` relative to `cwd` when inside it, else with `~` for `home` (`system.machine.home`). */
 export function shortenPath(path: string, options: { cwd?: string; home?: string } = {}): string {
@@ -60,6 +61,31 @@ export function plural(count: number, noun: string): string {
 /** What to show for a thrown value: an Error's message, anything else as a string. */
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/** When something happened, in local time: `just now`, `12m ago`, `today 14:05`, `yesterday 14:05`, `Nov 20, 21:57`, `Nov 20, 2025, 21:57`. */
+export function formatStamp(at: number, now = Date.now()): string {
+  if (now - at < 60 * 60_000) return formatAgo(at, now, { ago: true })
+  const date = new Date(at)
+  const midnight = new Date(now).setHours(0, 0, 0, 0)
+  if (at >= midnight) return `today ${formatTime(at)}`
+  if (at >= new Date(midnight).setDate(new Date(midnight).getDate() - 1))
+    return `yesterday ${formatTime(at)}`
+  const day = date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(date.getFullYear() === new Date(now).getFullYear() ? {} : { year: 'numeric' }),
+  })
+  return `${day}, ${formatTime(at)}`
+}
+
+/** The full local date and time with its zone, for a tooltip: `Tuesday, November 24, 2026 at 14:05:12 EST`. */
+export function formatFullTime(at: number): string {
+  return new Date(at).toLocaleString(undefined, {
+    dateStyle: 'full',
+    timeStyle: 'long',
+    hourCycle: 'h23',
+  })
 }
 
 /** The app's one clock format, 24-hour: `21:45`, or `21:45:08` with seconds. */

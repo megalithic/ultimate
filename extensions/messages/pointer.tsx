@@ -1,7 +1,7 @@
 import { ROOT } from '@/sdk'
 import { MessageCircleQuestionIcon, SquareArrowOutUpRightIcon } from 'lucide-react'
 import { Card, cn, events, renderEntry, useConversation, useDocOf, useUltimate } from '@/sdk'
-import { Address, useAccentOf } from './cards.tsx'
+import { Address, Stamp, useAccentOf } from './cards.tsx'
 import { MessagesDoc } from './refs.ts'
 import { AskedEntry, AnsweredEntry } from './entries.ts'
 import { openQuestion } from './data.tsx'
@@ -50,9 +50,12 @@ export const QuestionPointer = renderEntry(AskedEntry, function QuestionPointer(
         >
           {state && <span className="shrink-0">{state}</span>}
           {text && <span className="min-w-0 flex-1 truncate">{text}</span>}
-          <span className="ml-auto flex shrink-0 items-center gap-1">
-            <SquareArrowOutUpRightIcon className="size-3" />
-            Open
+          <span className="ml-auto flex shrink-0 items-center gap-2">
+            {message && <Stamp at={message.at} label="Asked" />}
+            <span className="flex items-center gap-1">
+              <SquareArrowOutUpRightIcon className="size-3" />
+              Open
+            </span>
           </span>
         </button>
       </header>

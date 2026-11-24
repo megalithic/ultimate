@@ -17,7 +17,7 @@ export function MessageActions({
 }: {
   entry: EntryRecord
   text: string
-  timestamp: number
+  timestamp?: number
   className?: string
   bubble?: boolean
 }) {
@@ -25,7 +25,6 @@ export function MessageActions({
   const details = messageItems(extensions, 'messageDetails')
   const contributions = messageItems(extensions, 'messageActions')
   const { conversationId: conversation, id } = entry
-  const date = new Date(timestamp)
   return (
     <div
       className={cn(
@@ -40,9 +39,15 @@ export function MessageActions({
           <Detail entry={entry} />
         </ExtensionBoundary>
       ))}
-      <time className="tabular-nums" dateTime={date.toISOString()} title={date.toLocaleString()}>
-        {formatTime(date)}
-      </time>
+      {timestamp !== undefined && (
+        <time
+          className="tabular-nums"
+          dateTime={new Date(timestamp).toISOString()}
+          title={new Date(timestamp).toLocaleString()}
+        >
+          {formatTime(timestamp)}
+        </time>
+      )}
       {text && (
         <CopyButton label="Copy message" value={text}>
           <CopyIcon />
