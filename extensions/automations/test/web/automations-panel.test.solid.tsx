@@ -97,12 +97,17 @@ vi.mock('../../../../web/src/sdk/client.ts', async () => {
         return Response.json({
           result: { path: '/automations/A2/run', text: '#!/bin/sh\necho OK' },
         })
+      case 'update':
       case 'pause':
       case 'run':
       case 'delete':
       case 'create': {
         const { args } = JSON.parse(init!.body as string)
         harness.actions.push({ name: action, args, source })
+        if (action === 'update')
+          harness.list = harness.list.map((item) =>
+            item.id === args.id ? { ...item, pinned: args.pinned || undefined } : item,
+          )
         if (action === 'pause')
           harness.list = harness.list.map((item) =>
             item.id === args.id ? { ...item, enabled: false } : item,
@@ -175,6 +180,25 @@ beforeEach(async ({ onTestFinished }) => {
     store.stop()
     vi.unstubAllGlobals()
   })
+})
+
+it('pins and unpins an automation in the menu bar with the exact update and writer', async () => {
+  panel()
+  await settle()
+  expect((await act('Pin Morning reports (A1)', 'setPressed', true)).ok).toBe(true)
+  await settle()
+  expect(harness.actions).toEqual([
+    { name: 'update', args: { id: 'A1', pinned: true }, source: 'agent' },
+  ])
+  expect(control('Unpin Morning reports (A1)')).toMatchObject({ pressed: true })
+  expect((await act('Unpin Morning reports (A1)', 'setPressed', false)).ok).toBe(true)
+  await settle()
+  expect(harness.actions.at(-1)).toEqual({
+    name: 'update',
+    args: { id: 'A1', pinned: false },
+    source: 'agent',
+  })
+  expect(control('Pin Morning reports (A1)')).toMatchObject({ pressed: false })
 })
 
 it('pauses, runs, and requires a person’s confirmation before deleting', async () => {

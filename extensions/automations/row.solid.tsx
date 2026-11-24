@@ -3,6 +3,7 @@ import {
   CircleAlert,
   Ellipsis,
   Pencil,
+  Pin,
   Play,
   RotateCw,
   SquareArrowOutUpRight,
@@ -23,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.solid.tsx'
 import { Switch } from '@/components/ui/switch.solid.tsx'
+import { Toggle as PinToggle } from '@/components/ui/toggle.solid.tsx'
 import {
   api,
   cn,
@@ -40,7 +42,14 @@ import {
 import { useRefreshList } from './live.solid.tsx'
 import { attention, clock, lookOf, looks, spent, stateLine, statusLabel } from './looks.ts'
 import { BusyDot, Dot, KindIcon, RunIcon, Tag } from './parts.solid.tsx'
-import { DeleteAction, DescribeAction, PauseAction, ResumeAction, RunAction } from './refs.ts'
+import {
+  DeleteAction,
+  DescribeAction,
+  PauseAction,
+  ResumeAction,
+  RunAction,
+  UpdateAction,
+} from './refs.ts'
 import type { Automation, Run, Schedule } from './refs.ts'
 import { actions, automationLabel, full, triggerWords, words } from './words.ts'
 
@@ -104,6 +113,35 @@ export function Toggle(props: { automation: Automation; now: number; act: Act })
       disabled={passed() || pending() !== undefined}
       title={title()}
     />
+  )
+}
+
+function AutomationPin(props: { automation: Automation; act: Act }) {
+  const [pending, setPending] = createSignal<boolean>()
+  const pinned = () => pending() ?? !!props.automation.pinned
+  const toggle = (next: boolean) => {
+    setPending(next)
+    void props
+      .act(api.action(UpdateAction, { id: props.automation.id, pinned: next }))
+      .finally(() => setPending(undefined))
+  }
+  return (
+    <PinToggle
+      aria-label={`${pinned() ? 'Unpin' : 'Pin'} ${automationLabel(props.automation)}`}
+      class="ms-auto shrink-0 text-muted-foreground/60 hover:text-foreground data-pressed:bg-transparent data-pressed:text-foreground"
+      disabled={pending() !== undefined}
+      onPressedChange={toggle}
+      pressed={pinned()}
+      size="icon-xs"
+      title={
+        pinned()
+          ? 'Pinned: shown in the Ultimate menu bar. Click to unpin'
+          : 'Pin to the Ultimate menu bar'
+      }
+      variant="ghost"
+    >
+      <Pin class={cn('size-3', pinned() && 'fill-current')} />
+    </PinToggle>
   )
 }
 
@@ -293,6 +331,7 @@ export function AutomationRow(props: {
           <span class="min-w-0 truncate pl-1 font-mono text-[10.5px] text-muted-foreground/60">
             {actions(item())}
           </span>
+          <AutomationPin act={act} automation={item()} />
           <DropdownMenu
             modal={false}
             onAction={(value) => {
@@ -303,7 +342,7 @@ export function AutomationRow(props: {
           >
             <DropdownMenuTrigger
               aria-label={`Actions for ${label()}`}
-              class="ml-auto grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-open:bg-accent"
+              class="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-open:bg-accent"
               ref={menu}
             >
               <Ellipsis aria-hidden="true" class="size-3.5" />
