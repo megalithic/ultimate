@@ -318,7 +318,7 @@ function helpers(host: ExtensionHost): Helper[] {
     {
       name: 'entries',
       description:
-        'Newest-first fork-aware stored history, including before resets and compactions. before is an exclusive entry ID. Entries are compact: message text whole, tool results kept at start and end, args and data cut, no thinking; full returns stored entries.',
+        'Newest-first fork-aware stored history, including before resets and compactions. before is an exclusive entry ID. Entries are compact: message text whole, tool results kept at start and end, args and data cut, no thinking; full returns stored entries. Page long histories with limit and before (the oldest returned id) and keep totals or ids, not whole pages: a remote answer over 1 MiB and a store() value over 256 KiB fail.',
       signature:
         '(conversationId: number, options?: { kinds?: string[]; limit?: number; before?: number; full?: boolean; project?: string; machine?: string; chapter?: string }): Promise<{ id: number; kind: string; at?: string; role?: string; tool?: string; text?: string; tools?: { name: string; args: string }[]; stopReason?: string; error?: string | true; data?: string }[]>',
       execute: read('entries', 1),
@@ -399,7 +399,9 @@ export const actions = {
     )
     const result = asJson(value) ?? null
     if (Buffer.byteLength(JSON.stringify(result)) > REMOTE_BYTES)
-      throw new Error('The answer is larger than 1 MiB; ask for a smaller limit')
+      throw new Error(
+        'The answer is larger than 1 MiB; page it: a smaller limit, then before set to the oldest returned id',
+      )
     return result
   },
 }

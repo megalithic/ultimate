@@ -113,6 +113,26 @@ Every pass starts from @ultimate's handoff in its brief, then reads with codemod
 `#conversation/entry`, a trace error, a commit or `path:line`. Conversation summaries and abstracts (in the root's
 tally, `ultimate.entries(<root>)`) are the cheap way in; open a conversation only where they point at something.
 
+Histories are large: read them in pages and keep only what the pass needs. A read answer over 1 MiB of JSON fails, and so
+does a `store()` value over 256 KiB (262,144 characters of JSON). So:
+
+- Page with `limit` and `before`: `ultimate.entries(id, { limit: 200, before })`, the next page's `before` being the
+  oldest returned `id`. Narrow with `kinds` and avoid `full: true` unless one entry's stored record is the point.
+- Fold each page into totals, counts or a few ids in a variable, and return or `store()` only those, never the pages.
+
+```js
+const totals = { calls: 0, failed: 0 }
+let before
+for (;;) {
+  const page = await ultimate.entries(id, { kinds: ['pi.tool-result'], limit: 200, before })
+  if (!page.length) break
+  totals.calls += page.length
+  totals.failed += page.filter((e) => e.error).length
+  before = page.at(-1).id
+}
+return totals
+```
+
 - **memory** — hold every memory to one test: would a branch starting next month act differently without it? Delete
   what fails: what the code, docs or instructions now show, one-off or tabled decisions, finished investigations,
   lessons a check now prevents. Merge overlaps, update what is outdated or contradicted, and add lessons later

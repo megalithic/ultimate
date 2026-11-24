@@ -141,7 +141,9 @@ export async function postAction(
   })
   const text = await response.text()
   if (Buffer.byteLength(text) > REMOTE_BYTES)
-    throw new Error(`${target.label} answered more than 1 MiB; ask for a smaller limit`)
+    throw new Error(
+      `${target.label} answered more than 1 MiB; page it: a smaller limit, then before set to the oldest returned id`,
+    )
   const body = (() => {
     try {
       return JSON.parse(text) as { result?: unknown; error?: string }
