@@ -1,9 +1,10 @@
-import { Check, Copy, ExternalLink } from '@lucide/solid'
+import { Check, ChevronDown, ChevronUp, Copy, ExternalLink } from '@lucide/solid'
 import { dynamic } from '@solidjs/web'
 import type { JSX } from '@solidjs/web'
 import { cn } from 'cn'
 import { find, html } from 'property-information'
 import {
+  createEffect,
   createMemo,
   createProjection,
   createSignal,
@@ -261,27 +262,90 @@ function CodeBlock(props: { code: string; language: string; incomplete: boolean;
   const renderers = createMemo(
     () => codeBlockRenderers(useExtensions()(), props.language) as Rendered[],
   )
-  const core = () => (
-    <div
-      class="code-block"
-      data-incomplete={props.incomplete || undefined}
-      data-language={props.language}
-    >
-      <div class="code-block-header">
-        <span>{props.language}</span>
-        <CopyCode at={props.at} code={props.code} />
-      </div>
-      <pre class="shiki">
-        <HighlightedCode code={props.code} language={props.language} />
-      </pre>
-    </div>
-  )
+  const core = () => <FencedCode {...props} fold={renderers().length === 0} />
   return (
     <Contributed<Parameters<CodeBlockRenderer>[0]>
       core={core}
       props={{ code: props.code, language: props.language, incomplete: props.incomplete }}
       renderers={renderers()}
     />
+  )
+}
+
+function FencedCode(props: {
+  code: string
+  language: string
+  incomplete: boolean
+  at: string
+  fold: boolean
+}) {
+  let block!: HTMLDivElement
+  let body!: HTMLPreElement
+  const [overflows, setOverflows] = createSignal(false)
+  const [open, setOpen] = createSignal(false)
+  const lines = createMemo(() => props.code.replace(/\n$/, '').split('\n').length)
+  createEffect(
+    () => ({ open: open(), lines: lines(), fold: props.fold }),
+    (state) => {
+      if (state.open || !state.fold) return undefined
+      const measure = () => setOverflows(body.scrollHeight > body.clientHeight + 1)
+      measure()
+      const observer = new ResizeObserver(measure)
+      observer.observe(block)
+      return () => observer.disconnect()
+    },
+  )
+  const toggle = () => {
+    const closing = open()
+    setOpen(!closing)
+    if (closing) requestAnimationFrame(() => block.scrollIntoView({ block: 'nearest' }))
+  }
+  return (
+    <div
+      class="code-block"
+      data-expanded={(props.fold && open()) || undefined}
+      data-incomplete={props.incomplete || undefined}
+      data-language={props.language}
+      ref={block}
+    >
+      <div class="code-block-header">
+        <span>{props.language}</span>
+        <CopyCode at={props.at} code={props.code} />
+      </div>
+      <pre class="shiki" ref={body}>
+        <HighlightedCode code={props.code} language={props.language} />
+      </pre>
+      <Show when={props.fold && overflows()}>
+        <div
+          class={cn(
+            'pointer-events-none absolute inset-x-px inset-be-px flex justify-center rounded-b-md pbe-2',
+            !open() && 'h-20 items-end bg-linear-to-t from-terminal via-terminal/85 to-transparent',
+          )}
+        >
+          <Button
+            aria-expanded={open() ? 'true' : 'false'}
+            aria-label={`${open() ? 'Collapse' : `Expand · ${lines()} lines`} (code ${props.at})`}
+            class="pointer-events-auto flex h-auto items-center gap-1 rounded-full border border-border/80 bg-background/90 px-2.5 py-0.5 font-mono text-[11px] font-normal text-muted-foreground shadow-sm hover:text-foreground active:bg-muted"
+            onClick={toggle}
+            size={null}
+            variant={null}
+          >
+            <Show
+              when={open()}
+              fallback={
+                <>
+                  <ChevronDown aria-hidden="true" class="size-3" />
+                  Expand · {lines()} lines
+                </>
+              }
+            >
+              <ChevronUp aria-hidden="true" class="size-3" />
+              Collapse
+            </Show>
+          </Button>
+        </div>
+      </Show>
+    </div>
   )
 }
 

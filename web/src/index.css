@@ -436,6 +436,9 @@
   & .code-block pre {
     @apply max-h-[400px] overflow-auto px-3 pt-0 pb-2.5 font-mono text-[12px] leading-[1.6];
   }
+  & .code-block[data-expanded] pre {
+    @apply max-h-none pbe-10;
+  }
   & .table {
     @apply my-3 flex flex-col rounded-md border border-border/80;
     & > div {

@@ -178,6 +178,39 @@ it('falls back to the core rendering when an extension renderer throws', () => {
   }
 })
 
+it('folds overflowing code, expands it and collapses it again', async () => {
+  const height = vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(400)
+  const content = vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockReturnValue(768)
+  const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    callback(0)
+    return 0
+  })
+  try {
+    const code = Array.from({ length: 40 }, (_, index) => `line ${index + 1}`).join('\n')
+    const view = renderSolid(() => <Markdown text={`\`\`\`text\n${code}\n\`\`\``} />)
+    const block = view.querySelector('.code-block')!
+    const toggle = () => view.querySelector<HTMLButtonElement>('[aria-expanded]')!
+    expect(toggle().textContent).toBe('Expand · 40 lines')
+    expect(toggle().getAttribute('aria-expanded')).toBe('false')
+    const name = toggle().getAttribute('aria-label')!
+    await agent.act({ steps: [{ ref: name, action: 'press' }] })
+    flush()
+    expect(block.hasAttribute('data-expanded')).toBe(true)
+    expect(toggle().textContent).toBe('Collapse')
+    expect(toggle().getAttribute('aria-expanded')).toBe('true')
+    await agent.act({ steps: [{ ref: toggle().getAttribute('aria-label')!, action: 'press' }] })
+    flush()
+    expect(block.hasAttribute('data-expanded')).toBe(false)
+    expect(toggle().textContent).toBe('Expand · 40 lines')
+    expect(block.querySelector('pre')?.textContent).toContain('line 40')
+    await expectDistinctAgentNames(agent)
+  } finally {
+    frame.mockRestore()
+    content.mockRestore()
+    height.mockRestore()
+  }
+})
+
 it('aligns table cells without letting the alignment carry other CSS', () => {
   const view = renderSolid(() => (
     <Markdown
