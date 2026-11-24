@@ -50,11 +50,15 @@ export function cardOf(
 ): CardState {
   const stored = cards?.[card]
   const drafts: Record<number, Draft> = {}
-  for (const index of questions.keys()) {
-    const draft = stored?.drafts[index]
+  for (const [index, question] of questions.entries()) {
+    const draft = stored?.drafts[index] ?? pickDraft(question)
     if (draft) drafts[index] = draft
   }
-  return { ...EMPTY_CARD, ...stored, drafts }
+  const firstWithoutPick = Math.max(
+    0,
+    questions.findIndex((_, index) => !drafts[index]),
+  )
+  return { ...EMPTY_CARD, current: firstWithoutPick, ...stored, drafts }
 }
 
 const steps = (question: CardQuestion) => {

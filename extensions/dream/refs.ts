@@ -105,7 +105,7 @@ export type ToolStats = {
     error: string
     tail?: string
     count: number
-    examples: { at: string; args: string }[]
+    examples: { at: string }[]
   }[]
 }
 /**

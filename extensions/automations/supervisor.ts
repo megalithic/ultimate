@@ -7,7 +7,7 @@ import type {
 } from '@earendil-works/pi-durable'
 import { constants } from 'node:fs'
 import type { Dirent } from 'node:fs'
-import { access, appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { access, appendFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context'
 import { defineTask, InboxDoc, ROOT_CONVERSATION_ID } from '@earendil-works/pi-durable'
@@ -97,10 +97,12 @@ const committedManifest = ({ to, ...rest }: Manifest) => ({
 type Delivery = {
   sub: Automation
   event: number | string
-  kind: 'writing' | 'fired' | 'failed' | 'escalated'
+  kind: 'writing' | 'fired' | 'finished' | 'failed' | 'escalated'
   text: string
   targets: Subscriber[]
+  reset?: Reset
 }
+type Reset = { previousPid?: number; stopWatcher: boolean }
 type AskBeforeConcurrentDiscovery = string
 type KeyedCreateRetry = boolean
 export type Prepared = {
@@ -112,6 +114,7 @@ export type Prepared = {
   subscribers?: Subscriber[]
   manifest?: Manifest
   previousAsk?: AskBeforeConcurrentDiscovery
+  previousOnce?: boolean
   keyed?: KeyedCreateRetry
 }
 type Run = {
@@ -228,7 +231,7 @@ export function supervisor(
               once: m.once,
               ...(m.secrets ? { secrets: m.secrets } : {}),
               to: m.to,
-              conversationId: await agentConversation(tx, prepared, id, m.name, host.projectRoot),
+              conversationId: await agentConversation(tx, prepared, id, m.name),
               state: 'stopped',
             },
             subscribers: [m.to],
@@ -267,13 +270,7 @@ export function supervisor(
     }, BACKGROUND_CONTEXT)
     for (const stop of removed) await apply(stop)
   }
-  async function agentConversation(
-    tx: Tx,
-    prepared: Prepared,
-    id: string,
-    name: string,
-    cwd: string,
-  ) {
+  async function agentConversation(tx: Tx, prepared: Prepared, id: string, name: string) {
     const child = await host.need(SubagentsApi).createChild(tx, {
       owner: { kind: 'ownerless' },
       definition: prepared.profile,
@@ -282,7 +279,7 @@ export function supervisor(
       metadata: host.metadata,
       label: WatcherLabel,
       title: `${id} · ${name}`,
-      cwd,
+      cwd: host.projectRoot,
     })
     return child.id
   }
@@ -330,14 +327,29 @@ export function supervisor(
       throw error
     }
   }
-  const Deliver = defineTask<Delivery, { phase: 'deliver' }, null>({
+  const Deliver = defineTask<Delivery, { phase: 'reset' } | { phase: 'deliver' }, null>({
     name: 'ultimate.automation-delivery',
     version: 1,
-    initial: () => ({ phase: 'deliver' }),
+    initial: (input) => ({ phase: input.reset ? 'reset' : 'deliver' }),
     phases: {
+      reset: async (task, runtime, ctx) => {
+        const { sub, reset } = task.input
+        await apply({ id: sub.id, action: 'pause', ...reset! })
+        if (reset!.stopWatcher)
+          await (
+            await runtime.conversation(sub.script!.conversationId, ctx)
+          )?.abort(ctx, { background: true })
+        await rm(join(folder(sub.id), 'state'), { recursive: true, force: true })
+        await runtime.commit(() => ({ status: 'running', checkpoint: { phase: 'deliver' } }), ctx)
+      },
       deliver: async (task, runtime, ctx) => {
         const { sub, event, kind, text, targets } = task.input
-        if (kind === 'writing') await mkdir(join(folder(sub.id), 'state'), { recursive: true })
+        const now = (await runtime.snapshot(Automations, ctx))?.automations[sub.id]
+        const toWatcherOfStoppedAutomation =
+          (kind === 'writing' || kind === 'failed') &&
+          (!now || (!now.enabled && now.script?.state !== 'writing'))
+        if (kind === 'writing' && !toWatcherOfStoppedAutomation)
+          await mkdir(join(folder(sub.id), 'state'), { recursive: true })
         const content =
           kind === 'writing'
             ? `${brief(sub)}\nWrite and briefly test run, then use automation resume {id:"${sub.id}"}. Ending your turn before resume or escalate escalates it.`
@@ -357,7 +369,7 @@ export function supervisor(
               `automations:${sub.id}:${event}:ultimate`,
               ctx,
             )
-        for (const target of targets) {
+        for (const target of toWatcherOfStoppedAutomation ? [] : targets) {
           const id =
             typeof target === 'string'
               ? await host.need(SubagentsApi).standing(target.slice(1), ctx)
@@ -384,13 +396,13 @@ export function supervisor(
                 id: sub.id,
                 name: sub.name,
                 text,
-                ...(kind === 'fired' && sub.branches?.by === id
+                ...((kind === 'fired' || kind === 'finished') && sub.branches?.by === id
                   ? { branches: sub.branches.ids }
                   : {}),
               },
             },
           }
-          if (kind === 'fired')
+          if (kind === 'fired' || kind === 'finished')
             await host
               .harness()
               .commit((tx) => host.need(MessagesApi).submitFire(tx, conversation, input, sub), ctx)
@@ -408,6 +420,7 @@ export function supervisor(
     event: number | string,
     kind: Delivery['kind'],
     text: string,
+    reset?: Reset,
   ) {
     await tx.createTask(
       Deliver,
@@ -416,6 +429,7 @@ export function supervisor(
         event,
         kind,
         text,
+        ...(reset ? { reset } : {}),
         targets:
           kind === 'writing' || kind === 'failed'
             ? [sub.script!.conversationId]

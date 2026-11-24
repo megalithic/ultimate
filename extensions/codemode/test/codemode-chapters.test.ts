@@ -93,6 +93,7 @@ it('reads closed chapter records exactly like live fork-aware history, with titl
     }, context)
     // Naming the active chapter reads the harness too.
     expect(await read('entries', [fork.id, { chapter: 'next' }])).toEqual(live)
+    expect(await read('entries', [fork.id, { limit: 5000 }])).toEqual(live)
     await opened.close()
     await requestChapter(home, FIRST_CHAPTER)
     opened = await prepared.open(false)
@@ -116,8 +117,12 @@ it('reads closed chapter records exactly like live fork-aware history, with titl
     await expect(read('entries', [fork.id])).rejects.toThrow(
       `Unknown conversation ${fork.id} in the open chapter ${FIRST_CHAPTER}; read another chapter's history with { chapter: '<name>' } on entries, search or conversations`,
     )
-    await expect(read('entries', [fork.id, { chapter: 'next', limit: 0 }])).rejects.toThrow(
-      'limit must be',
+    expect(await read('entries', [fork.id, { chapter: 'next', limit: 5000 }])).toEqual(live)
+    expect(
+      await read('entries', [fork.id, { chapter: 'next', kinds: ['chapter.note'], limit: 0 }]),
+    ).toEqual(filtered)
+    await expect(read('entries', [fork.id, { chapter: 'next', limit: 'all' }])).rejects.toThrow(
+      'limit must be a number',
     )
     await expect(read('entries', [0, { chapter: 'next' }])).rejects.toThrow(
       'conversationId must be',

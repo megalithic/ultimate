@@ -21,8 +21,8 @@ import type { ActionContext } from '../../server/actions.ts'
 import type { ExtensionHost } from '../../server/extensions.ts'
 import { Branches, WorkspacesApi } from '../workspaces/api.ts'
 import { Standing, SubagentsApi } from '../subagents/api.ts'
-import { LineageApi } from '../lineage/api.ts'
-import { Messages, MessagesApi } from './api.ts'
+import { LineageApi, Replies } from '../lineage/api.ts'
+import { Judgements, Messages, MessagesApi } from './api.ts'
 import type { AnswerScope } from './api.ts'
 import { gist, openQuestion, openQuestionsNote, questionsParameter } from './questions.ts'
 import { callerOf } from './caller.ts'
@@ -36,18 +36,24 @@ import { markStarted, owed, parentOf, Serving, Started, starterOf } from './addr
 import { Concluded } from '../conversations/api.ts'
 import { dropped } from './outcomes.ts'
 import { delivery, reconcileOutputs, retireOutput, settle, submitOutput } from './delivery.ts'
-import { notice } from './notice.ts'
 import { receiptOf, send } from './send.ts'
 import type { Device } from '../../shared/events.ts'
 import type { Context } from '@earendil-works/chord/context'
 import { branchesConcluded, reported, route, working } from './route.ts'
-import { projectsSection, remoteAction, remoteReplyAction, tellTask, tell } from './remote.ts'
+import {
+  dismissTell,
+  projectsSection,
+  remoteAction,
+  remoteReplyAction,
+  tellTask,
+  tell,
+} from './remote.ts'
 import { branchTool } from './branch.ts'
 import { remoteProgress } from './progress.ts'
 import { instance } from './instance.ts'
 import { safeToRerun } from '../../lib/replay.ts'
 export { gist, openQuestionsNote } from './questions.ts'
-export const docs = [Messages, Started, Serving]
+export const docs = [Messages, Started, Serving, Judgements]
 
 async function openMessage(host: ExtensionHost, messageId: number, ctx: Context) {
   const log = await host.harness().snapshot(Messages, ROOT_CONVERSATION_ID, ctx)
@@ -139,7 +145,7 @@ async function userRunInput(host: ExtensionHost, id: ConversationId, ctx: Contex
     const record = await (await host.harness().submission(submission, ctx))?.status(ctx)
     if (record?.type !== 'input' || record.entry === undefined) continue
     const entry = await host.harness().commit((tx) => tx.entry(record.entry!), ctx)
-    if (entry?.kind === 'pi.user' || entry?.kind === 'voice.utterance') found = entry.id
+    if (entry?.kind === 'pi.user') found = entry.id
   }
   return found
 }
@@ -182,6 +188,11 @@ export const actions = {
       (await actingAs(host, conversationId, ctx)) !== primary
     )
       throw new Error("Only @ultimate settles the user's questions")
+    const log = await host.harness().snapshot(Messages, ROOT_CONVERSATION_ID, ctx)
+    if (log?.messages.some((m) => m.id === messageId && m.to === 'remote')) {
+      if (!closing) throw new Error('A request to another project closes only with dismiss: true')
+      return { id: await dismissTell(host, primary, messageId as number, text.trim(), ctx) }
+    }
     const entry = await userRunInput(host, conversationId, ctx)
     const via = { conversation: conversationId, ...(entry === undefined ? {} : { entry }) }
     return {
@@ -249,6 +260,14 @@ export default function messages(host: ExtensionHost) {
       await submitOutput(host, tx, to, input, { kind: 'branch', id }, `#${id}`, `landing:${result}`)
     },
   })
+  host.implement(Replies, {
+    replied: async (from, to, entry, ctx) =>
+      Boolean(
+        (await host.harness().snapshot(Messages, ROOT_CONVERSATION_ID, ctx))?.messages.some(
+          (m) => m.from === from && m.to === to && m.answer === entry,
+        ),
+      ),
+  })
   host.implement(MessagesApi, {
     answer: (messageId, text, ctx, device, call, scope) =>
       answer(host, messageId, text, ctx, { device, call, scope }),
@@ -271,10 +290,10 @@ export default function messages(host: ExtensionHost) {
   })
   return defineExtension({
     name: 'messages',
-    tasks: [delivery(host), route(host), settle(host), notice(host), tellTask(host)],
+    tasks: [delivery(host), route(host), settle(host), tellTask(host)],
     hooks: [
       hook(GenerationTask, {
-        // Pi upstream: @earendil-works/pi-durable@1.5.2 — patched transactional beforeInput hook.
+        // Pi upstream: @earendil-works/pi-durable@1.6.0 — patched transactional beforeInput hook.
         beforeInput: (_input, api) => openQuestionsNote(api.tx, api.conversationId, Date.now()),
         onYield: async (_answer, api, ctx) => {
           let by = (await api.snapshot(Started, api.conversationId, ctx))?.by
@@ -290,13 +309,15 @@ export default function messages(host: ExtensionHost) {
               started.yielded !== undefined && started.yielded >= api.taskId
             if (generationObserverAlreadyCreated) return
             started.yielded = api.taskId
-            await tx.createTask(
+            const after = started.lastRoute
+            started.lastRoute = await tx.createTask(
               route(host),
               {
                 generation: api.taskId as TaskId<GenerationResult>,
                 inputs: [...((await tx.doc(LiveDoc, api.conversationId)).run?.inputs ?? [])],
                 by,
                 ...(down ? { down } : {}),
+                ...(after !== undefined ? { after } : {}),
               },
               {
                 ownership: { kind: 'conversation' },
@@ -320,8 +341,8 @@ export default function messages(host: ExtensionHost) {
         const upward =
           starter === undefined
             ? ''
-            : ` #${starter} started you: when you stop with nothing under way (no subagent, landing or reply pending), your final answer goes to it and wakes it; while work is under way it arrives as a note, and so do your one-way messages to it.`
-        return `Use message to contact #id or @name. @ultimate, standing agents and branches may message user. Messages wake their recipient; its answer returns as a reply and wakes you. End your turn instead of waiting. A one-way message (reply: false) gets no answer; use reply: true when you need one. Inputs identify their sender; answer here and your answer is sent to the sender automatically; do not use message to reply. A message to an agent whose message you still owe an answer becomes that answer and ends your run; use it only to attach images. To point the user at a message or question card, write \`message <id>\` (ids are global to this Ultimate): it renders as a link to the card. An id from another project's Ultimate, such as \`delivered\` from \`ultimate.tell\`, is written \`message <id>@<project>\` (\`@<project>:<machine>\` for one on another machine), which opens it there.${upward}\n${agents.map((a) => `@${a.name} — ${a.description}`).join('\n')}`
+            : ` #${starter} started you: when you stop with nothing under way (no subagent, landing or reply pending), your final answer goes to it and wakes it; while work is under way, or when it is only back-and-forth with the user in your conversation (not a decision, result, blocker or request for #${starter}), it arrives as a note, and so do your one-way messages to it.`
+        return `Use message to contact #id or @name. Any conversation except a subagent may message user. Messages wake their recipient; its answer returns as a reply and wakes you. End your turn instead of waiting. A one-way message (reply: false) gets no answer; use reply: true when you need one. Inputs identify their sender; answer here and your answer is sent to the sender automatically; do not use message to reply. A message to an agent whose message you still owe an answer becomes that answer and ends your run; use it only to attach images. To point the user at a message or question card, write \`message <id>\` (ids are global to this Ultimate): it renders as a link to the card. An id from another project's Ultimate, such as \`delivered\` from \`tools.tell\`, is written \`message <id>@<project>\` (\`@<project>:<machine>\` for one on another machine), which opens it there.${upward}\n${agents.map((a) => `@${a.name} — ${a.description}`).join('\n')}`
       }),
 
       section('projects', async (input, ctx) => {
