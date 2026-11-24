@@ -113,8 +113,8 @@ Every pass starts from @ultimate's handoff in its brief, then reads with codemod
 `#conversation/entry`, a trace error, a commit or `path:line`. Conversation summaries and abstracts (in the root's
 tally, `ultimate.entries(<root>)`) are the cheap way in; open a conversation only where they point at something.
 
-Histories are large: read them in pages and keep only what the pass needs. A read answer over 1 MiB of JSON fails, and so
-does a `store()` value over 256 KiB (262,144 characters of JSON). So:
+Histories are large: read them in pages and keep only what the pass needs. A cross-project read answer over 1 MiB of
+JSON fails, and so does a `store()` value over 256 KiB (262,144 characters of JSON). So:
 
 - Page with `limit` and `before`: `ultimate.entries(id, { limit: 200, before })`, the next page's `before` being the
   oldest returned `id`. Narrow with `kinds` and avoid `full: true` unless one entry's stored record is the point.
