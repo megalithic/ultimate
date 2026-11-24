@@ -279,6 +279,15 @@ async function fixture(
       return fauxAssistantMessage([fauxToolCall('branch', JSON.parse(command.slice(7)))], {
         stopReason: 'toolUse',
       })
+    // @ultimate announces a branch in the same round that starts it, before its id exists.
+    if (last.role === 'user' && command.startsWith('BRANCHANDSEND '))
+      return fauxAssistantMessage(
+        [
+          fauxToolCall('branch', { prompt: 'Explore', isolated: false }),
+          fauxToolCall('message', JSON.parse(command.slice(14))),
+        ],
+        { stopReason: 'toolUse' },
+      )
     if (last.role === 'user' && command.startsWith('SEND '))
       return fauxAssistantMessage([fauxToolCall('message', JSON.parse(command.slice(5)))], {
         stopReason: 'toolUse',
@@ -1485,6 +1494,23 @@ async function branched(f: Awaited<ReturnType<typeof fixture>>, prompt = 'Explor
   await settled()
   return { id, branch, from, later, settled }
 }
+it('refuses a message sent beside a branch call, so no branch id is named before it exists', async () => {
+  const f = await fixture()
+  await enableBranch(f)
+  await (
+    await f.opened.root.submit(
+      {
+        type: 'input',
+        content: 'BRANCHANDSEND ' + JSON.stringify({ to: 'user', text: 'Started branch #999' }),
+      },
+      context,
+    )
+  ).wait(context)
+  const sent = (await f.log())!.messages.filter((m) => m.from === 1)
+  expect(sent.map((m) => m.to)).not.toContain('user')
+  expect(sent.filter((m) => m.to !== 'user')).toHaveLength(1)
+  expect(f.transcripts.join('\n')).toContain('Not sent: a branch call in the same tool round')
+})
 it("applies the coordinator definition's denied tools to a new branch, for the model and for scripts", async () => {
   const f = await fixture()
   const coordinator = join(f.host.ultimateRoot, 'agents/coordinator.md')

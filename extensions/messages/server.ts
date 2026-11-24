@@ -359,7 +359,7 @@ export default function messages(host: ExtensionHost) {
       defineTool({
         name: 'message',
         description:
-          'Send a message to #id or @name; it returns immediately. A busy recipient gets it after its current run, or during it with steer: true (the default for @ultimate). images forwards screenshots or other images from your conversation, to an agent or to the user. To an agent or the user whose message you owe an answer, it is that answer (with its images and questions). One to an agent ends your run; one to the user ends it too, unless an agent still waits for your answer or a branch whose reply or report you read in this run does. Sent from codemode or beside other calls in its tool round, it never ends the run.',
+          'Send a message to #id or @name; it returns immediately. A busy recipient gets it after its current run, or during it with steer: true (the default for @ultimate). images forwards screenshots or other images from your conversation, to an agent or to the user. To an agent or the user whose message you owe an answer, it is that answer (with its images and questions). One to an agent ends your run; one to the user ends it too, unless an agent still waits for your answer or a branch whose reply or report you read in this run does. Sent from codemode or beside other calls in its tool round, it never ends the run. Beside a branch call it is refused: send it in the next round, quoting the id branch returned.',
         parameters: obj({
           to: str(),
           text: str({ minLength: 1 }),
@@ -372,6 +372,14 @@ export default function messages(host: ExtensionHost) {
           'The task-scoped receipt deduplicates admission; the memo returns the same id on replay.',
         ),
         async execute(input, api, ctx) {
+          const round = (await host.harness().snapshot(LiveDoc, api.conversationId, ctx))?.tools
+          const besideBranch =
+            round?.some((slot) => slot.callId === api.callId) &&
+            round.some((slot) => slot.name === 'branch')
+          if (besideBranch && (await api.memo<number>('message-id', ctx)) === undefined)
+            throw new Error(
+              'Not sent: a branch call in the same tool round has not returned its id yet. Send this message in your next round and quote the id from its result ("Branch #<id> started").',
+            )
           const toUserWithoutBorrowedPrivilege = input.to === 'user'
           const from = toUserWithoutBorrowedPrivilege
             ? api.conversationId
