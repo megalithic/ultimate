@@ -47,7 +47,7 @@ export type Seed = {
   continues: { conversation: ConversationId; handoff: string }
 }
 
-type BuiltInSeed = { enabled: boolean; condition?: CreateArgs['condition'] }
+type BuiltInSeed = { enabled: boolean; pinned?: true; condition?: CreateArgs['condition'] }
 
 export const PASSES = ['memory', 'failures', 'tools', 'corrections', 'codify', 'project'] as const
 export type PassName = (typeof PASSES)[number]

@@ -417,6 +417,30 @@ it('carries pinned triggers even while paused, keeping them paused, and drops un
   ])
 })
 
+it('re-pins a pinned project script once, so a later unpin survives a restart, and retries a failed pin', async () => {
+  const f = await fixture()
+  await f.source()
+  const seed = await buildSeed(f.host, PREPARED)
+  seed.scripts = [{ id: 'ci-watch', scope: 'project', name: 'CI', ask: 'Watch CI', pinned: true }]
+  await writeSeed(f.host.chapter.dir, seed)
+  const pins = () =>
+    f.invoke.mock.calls.filter(
+      ([, action, args]) => action === 'update' && (args as { id: string }).id === 'ci-watch',
+    ).length
+  await applySeed(f.host)
+  expect(pins()).toBe(1)
+  const receipt = await f.harness.snapshot(SeedState, ROOT_CONVERSATION_ID, context)
+  expect(receipt?.repinnedProjectScripts).toBeUndefined()
+  f.invoke.mockImplementationOnce(async () => ({}))
+  await applySeed(f.host)
+  expect(pins()).toBe(2)
+  expect(
+    (await f.harness.snapshot(SeedState, ROOT_CONVERSATION_ID, context))?.repinnedProjectScripts,
+  ).toEqual(['ci-watch'])
+  await applySeed(f.host)
+  expect(pins()).toBe(2)
+})
+
 it('carries event and standing context triggers, but leaves numeric context targets for recreation', async () => {
   const f = await fixture()
   await f.source()

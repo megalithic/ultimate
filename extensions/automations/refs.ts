@@ -20,6 +20,8 @@ export type {
 export type { AutomationInput } from '../entries/refs.ts'
 export type Described = { schedule: Schedule; description: string; next: number[] }
 type Id = { id: string }
+/** `expectName` refuses the change when the id now names another automation (ids restart per chapter). */
+type Expected = Id & { expectName?: string }
 /** Available domain event triggers and filter fields. */
 export const EventsAction = actionRef<null, TriggerEvent[]>('automations', 'events')
 /** No arguments → all automations, with process-local alive. */
@@ -32,11 +34,11 @@ export const UpdateAction = actionRef<
   Automation
 >('automations', 'update')
 /** Pause a trigger, terminating its script process group if present. */
-export const PauseAction = actionRef<Id, Automation>('automations', 'pause')
+export const PauseAction = actionRef<Expected, Automation>('automations', 'pause')
 /** Resume a trigger; scripts require an executable run file. */
-export const ResumeAction = actionRef<Id, Automation>('automations', 'resume')
+export const ResumeAction = actionRef<Expected, Automation>('automations', 'resume')
 /** Fire a schedule, event or condition now, or relaunch a script. */
-export const RunAction = actionRef<Id, Run | Automation | Id>('automations', 'run')
+export const RunAction = actionRef<Expected, Run | Automation | Id>('automations', 'run')
 /** Delete a record; files and conversations remain. */
 export const DeleteAction = actionRef<Id, Id>('automations', 'delete')
 /** Parse a schedule and describe its next fire times. */

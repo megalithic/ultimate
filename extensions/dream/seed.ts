@@ -16,7 +16,11 @@ import { deliver } from './delivery.ts'
 import type { Prepared } from './refs.ts'
 import type { Seed } from './types.ts'
 
-export const SeedState = defineDoc<{ applied?: number; automations: string[] }>({
+export const SeedState = defineDoc<{
+  applied?: number
+  automations: string[]
+  repinnedProjectScripts?: string[]
+}>({
   kind: 'dream.seed',
   checkpointWhen: () => false,
   version: 1,
@@ -47,6 +51,7 @@ const builtInOf = (item: Automation | undefined) =>
   item
     ? {
         enabled: item.enabled,
+        ...(item.pinned ? { pinned: true as const } : {}),
         ...(item.condition ? { condition: conditionOf(item.condition) } : {}),
       }
     : null
@@ -277,13 +282,21 @@ export async function applySeed(host: ExtensionHost) {
       if (!saved.automations.includes(automation.name)) saved.automations.push(automation.name)
     }, context)
   }
-  for (const { id, pinned, scope } of seed.scripts)
-    if (pinned && scope === 'project')
-      await host
-        .invoke('automations', 'update', { id, pinned: true }, signal)
-        .catch((error: unknown) =>
-          host.notice(`Could not pin project automation ${id}: ${String(error)}`),
-        )
+  for (const { id, pinned, scope } of seed.scripts) {
+    if (!pinned || scope !== 'project') continue
+    const receipt = await harness.snapshot(SeedState, ROOT_CONVERSATION_ID, context)
+    if (receipt?.repinnedProjectScripts?.includes(id)) continue
+    try {
+      await host.invoke('automations', 'update', { id, pinned: true }, signal)
+    } catch (error) {
+      host.notice(`Could not pin project automation ${id}: ${String(error)}`)
+      continue
+    }
+    await harness.commit(async (tx) => {
+      const saved = await tx.doc(SeedState, ROOT_CONVERSATION_ID)
+      saved.repinnedProjectScripts = [...new Set([...(saved.repinnedProjectScripts ?? []), id])]
+    }, context)
+  }
   harness.resume()
   return seed
 }

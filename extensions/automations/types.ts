@@ -105,6 +105,7 @@ export type Args = Partial<CreateArgs> & {
   to?: string
   lines?: number
   reason?: string
+  expectName?: string
 }
 export type Manifest = { name: string; ask: string; once: boolean; secrets?: string[]; to: string }
 export const STANDING = /^@[a-zA-Z0-9_-]+$/

@@ -493,6 +493,12 @@ it('pins and unpins through update, keeping the schedule, and lists the flag', a
   const unpinned = (await f.action('update', { id: a.id, pinned: false })) as Automation
   expect(unpinned).not.toHaveProperty('pinned')
   await expect(f.action('update', { id: a.id, pinned: 'yes' })).rejects.toThrow('pinned must be')
+  await expect(f.action('pause', { id: a.id, expectName: 'Another' })).rejects.toThrow(
+    'is now "Main", not "Another"',
+  )
+  expect((await f.records())[0].enabled).toBe(false)
+  await f.action('resume', { id: a.id, expectName: 'Main' })
+  expect((await f.records())[0].enabled).toBe(true)
 })
 
 it('migrates schedule records saved before scripts and subscribers', async () => {

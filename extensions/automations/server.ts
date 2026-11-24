@@ -406,6 +406,8 @@ function backend(host: ExtensionHost) {
     const id = validId(args.id)
     const sub = state.automations[id]
     if (!sub) throw new Error(`Unknown automation: ${id}`)
+    if (args.expectName !== undefined && sub.name !== args.expectName)
+      throw new Error(`Automation ${id} is now "${sub.name}", not "${args.expectName}"`)
     if (args.action === 'log') return { result: { text: await tail(id, args.lines) } }
     sub.updatedAt = Date.now()
     if (args.action === 'subscribe')
@@ -606,6 +608,8 @@ function backend(host: ExtensionHost) {
     }
     const a = state.automations[id]
     if (!a) throw new Error(`Unknown automation: ${id}`)
+    if (args.expectName !== undefined && a.name !== args.expectName)
+      throw new Error(`Automation ${id} is now "${a.name}", not "${args.expectName}"`)
     if (args.action === 'runs') return { result: a.runs }
     if (args.action === 'run' && !a.script)
       return { result: await schedule.fire(tx, a, Date.now()) }

@@ -103,6 +103,7 @@ async function ensureOne(host: ExtensionHost, builtIn: BuiltIn, seed: Seed | und
       condition: carried?.condition ?? condition,
       subscribers: ['@ultimate'],
       key: `dream:${doc.definition.kind}`,
+      ...(carried?.pinned ? { pinned: true } : {}),
     },
     signal,
   )) as Automation

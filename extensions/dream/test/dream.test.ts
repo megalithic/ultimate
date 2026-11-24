@@ -225,6 +225,7 @@ it('makes the built-ins again in a new chapter with the conditions the user edit
   await f.action('update', { id, condition: { metric: 'context', of: '@ultimate', above: 22 } })
   await f.action('update', {
     id: pause,
+    pinned: true,
     condition: {
       metric: 'context',
       of: '@ultimate',
@@ -233,6 +234,7 @@ it('makes the built-ins again in a new chapter with the conditions the user edit
       cooldownMs: 60_000,
     },
   })
+  await f.action('pause', { id: pause })
   const prepared = {
     chapter: 'next',
     learned: ['one', 'two', 'three'],
@@ -247,12 +249,16 @@ it('makes the built-ins again in a new chapter with the conditions the user edit
   }, context)
   await writeJson(`${f.host.chapter.dir}/seed.json`, seed)
   await ensureAutomation(f.host)
-  expect(await f.record((await f.own())!)).toMatchObject({
+  const own = await f.record((await f.own())!)
+  expect(own).toMatchObject({
     name: AUTOMATION_NAME,
     condition: { above: 22, cooldownMs: 3600_000 },
   })
+  expect(own.pinned).toBeUndefined()
   expect(await f.record((await f.ownPause())!)).toMatchObject({
     name: PAUSE_NAME,
+    pinned: true,
+    enabled: false,
     condition: { above: 20, idleFor: 3600_000, cooldownMs: 60_000 },
   })
 })
