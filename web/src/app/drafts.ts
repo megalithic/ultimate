@@ -54,6 +54,17 @@ export function fillComposer(id: number, text: string) {
   if (draft.key) localStorage.setItem(draft.key, text)
 }
 
+export function composerDraft(id: number) {
+  const { text, images, files, revision } = getDraft(id).get()
+  return text.trim() || images.length || files.length
+    ? { text, revision, images: images.length, files: files.length }
+    : undefined
+}
+
+export function clearComposer(id: number, sent: { text: string; revision: number }) {
+  clearDraft(getDraft(id), sent)
+}
+
 export function insertIntoComposer(id: number, text: string) {
   const draft = getDraft(id)
   const current = draft.get().text

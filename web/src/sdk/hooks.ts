@@ -469,7 +469,13 @@ export { uncoveredComposer } from './actions.ts'
  * cursor. `composerImages(id)` reads the images pasted into its composer, and `clear()` removes them once sent unless
  * they changed meanwhile.
  */
-export { composerImages, fillComposer, insertIntoComposer } from '../app/drafts.ts'
+export {
+  clearComposer,
+  composerDraft,
+  composerImages,
+  fillComposer,
+  insertIntoComposer,
+} from '../app/drafts.ts'
 
 /** The conversation `ConversationScope` gives, or the shown one once known. */
 export function useConversationId(): Accessor<ConversationId | undefined> {

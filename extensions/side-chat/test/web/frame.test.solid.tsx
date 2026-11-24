@@ -13,6 +13,7 @@ const harness = vi.hoisted(() => ({
   sources: [] as FakeSource[],
   server: undefined as ReturnType<typeof fakeSubscriptions> | undefined,
   opened: [] as { args: unknown; source: string | null }[],
+  endings: [] as { action: string; args: unknown; keepalive: boolean }[],
 }))
 vi.mock('../../../../web/src/sdk/client.ts', async () => {
   const { createStore } = await import('../../../../web/src/sdk/store.ts')
@@ -26,6 +27,14 @@ vi.mock('../../../../web/src/sdk/client.ts', async () => {
       harness.opened.push({
         args: JSON.parse(init!.body as string).args,
         source: new Headers(init?.headers).get('x-ultimate-source'),
+      })
+      return Response.json({ result: { id: 82 } })
+    }
+    if (/\/actions\/(inject|discard)$/.test(path)) {
+      harness.endings.push({
+        action: path.split('/').at(-1)!,
+        args: JSON.parse(init!.body as string).args,
+        keepalive: !!init?.keepalive,
       })
       return Response.json({ result: { id: 82 } })
     }
@@ -49,7 +58,8 @@ vi.mock('../../../../web/src/sdk/client.ts', async () => {
 })
 
 import { store, uiState } from '../../../../web/src/sdk/client.ts'
-import { ComposerRedirect } from '../../../../web/src/sdk/solid.ts'
+import { ComposerRedirect, composerDraft, fillComposer } from '../../../../web/src/sdk/solid.ts'
+import { AskAboutItem } from '../../item.solid.tsx'
 import { ComposerFrame } from '../../frame.solid.tsx'
 import web from '../../web.solid.tsx'
 
@@ -59,6 +69,8 @@ const main = 44
 beforeEach(async ({ onTestFinished }) => {
   harness.sources.length = 0
   harness.opened.length = 0
+  harness.endings.length = 0
+  fillComposer(82, '')
   uiState.receive({})
   store.start()
   onTestFinished(() => store.stop())
@@ -183,6 +195,146 @@ it('opens the side chat in a scoped sheet and restores the main transcript when 
   flush()
   expect(section.hasAttribute('inert')).toBe(true)
   expect(transcript.inert).toBe(false)
+})
+
+async function mountSide() {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
+  const [Stage] = web.slots!['conversation.overlay'] as Component[]
+  const container = renderSolid(() => <Stage />)
+  await settle()
+  harness.server!.of(main)!.send('doc', {
+    kind: 'sidechat.index',
+    value: { sides: [{ id: 82, at: 40, openedAt: 1 }] },
+  })
+  uiState.set('ext.side-chat.front', 82)
+  flush()
+  await settle()
+  harness.server!.of(82)!.send('view', {
+    conversation: { id: 82 },
+    entries: [],
+    docs: { sidechat: { of: main, at: 40, effects: false } },
+  } as unknown as StreamedView)
+  harness.server!.of(82)!.send('doc', {
+    kind: 'sidechat',
+    value: { of: main, at: 40, effects: false },
+  })
+  flush()
+  return container
+}
+
+it('keeps an unsent draft or quotes it verbatim before ending, clearing only what was sent', async () => {
+  const container = await mountSide()
+  fillComposer(82, '  Also check\nthe login *flow*\n')
+  const summarize = () =>
+    container.querySelector<HTMLButtonElement>('[aria-label="Summarize side chat #82"]')!.click()
+  summarize()
+  flush()
+  expect(container.querySelector('[data-draft-guard]')).not.toBeNull()
+  expect(harness.endings).toEqual([])
+  await expectDistinctAgentNames(agent)
+  expect(await agent.act({ steps: [{ ref: 'Keep editing', action: 'press' }] })).toMatchObject({
+    ok: true,
+  })
+  flush()
+  expect(container.querySelector('[data-draft-guard]')).toBeNull()
+  expect(composerDraft(82)?.text).toBe('  Also check\nthe login *flow*\n')
+  summarize()
+  flush()
+  expect(await agent.act({ steps: [{ ref: 'Include draft', action: 'press' }] })).toMatchObject({
+    ok: true,
+  })
+  await settle()
+  expect(harness.endings).toEqual([
+    {
+      action: 'inject',
+      args: { id: 82, draft: '  Also check\nthe login *flow*\n' },
+      keepalive: false,
+    },
+  ])
+  expect(composerDraft(82)).toBeUndefined()
+})
+
+it('can summarize without an unsent draft, leaving it in the composer', async () => {
+  const container = await mountSide()
+  fillComposer(82, 'leave this out')
+  container.querySelector<HTMLButtonElement>('[aria-label="Summarize side chat #82"]')!.click()
+  flush()
+  expect(await agent.act({ steps: [{ ref: 'Without it', action: 'press' }] })).toMatchObject({
+    ok: true,
+  })
+  await settle()
+  expect(harness.endings).toEqual([{ action: 'inject', args: { id: 82 }, keepalive: false }])
+  expect(composerDraft(82)?.text).toBe('leave this out')
+})
+
+it('asks before discarding a draft and can keep editing', async () => {
+  const container = await mountSide()
+  fillComposer(82, 'not sent')
+  container.querySelector<HTMLButtonElement>('[aria-label="Discard side chat #82"]')!.click()
+  flush()
+  expect(container.textContent).toContain('Unsent draft')
+  expect(container.textContent).not.toContain('Include draft')
+  expect(await agent.act({ steps: [{ ref: 'Keep editing', action: 'press' }] })).toMatchObject({
+    ok: true,
+  })
+  flush()
+  expect(harness.endings).toEqual([])
+  expect(composerDraft(82)?.text).toBe('not sent')
+})
+
+it('opens an item follow-up with its context and returns to the existing side chat', async () => {
+  const container = renderSolid(() => (
+    <AskAboutItem
+      key="shell:a"
+      at={1}
+      conversation={parseConversationId(69)}
+      tag="shell"
+      title="Review output"
+      text="Full output"
+      pane={null}
+    />
+  ))
+  await settle()
+  expect(container.querySelector('textarea')?.placeholder).toBe('Ask #69 about this…')
+  await expectDistinctAgentNames(agent)
+  expect(
+    await agent.act({
+      steps: [
+        {
+          ref: 'Ask about Inbox item shell:a',
+          action: 'setValue',
+          args: ['  Why this output?\n'],
+        },
+        { ref: 'Ask in a side chat about shell:a', action: 'press' },
+      ],
+    }),
+  ).toMatchObject({ ok: true })
+  expect(harness.opened).toEqual([
+    {
+      args: {
+        item: {
+          key: 'shell:a',
+          conversation: 69,
+          title: 'Review output',
+          text: 'Full output',
+        },
+        text: '  Why this output?\n',
+      },
+      source: 'agent',
+    },
+  ])
+  expect(uiState.snapshot()['ext.side-chat.front']).toBe(82)
+  harness.server!.of(1)!.send('doc', {
+    kind: 'sidechat.items',
+    value: { sides: [{ id: 82, of: 69, item: 'shell:a' }] },
+  })
+  flush()
+  expect(container.querySelector('textarea')).toBeNull()
+  expect(container.querySelector('[data-item-side-chat="82"]')).not.toBeNull()
 })
 
 it('switches to side chat mode on Tab or the switch, opens a side chat on send, then returns to normal', async () => {

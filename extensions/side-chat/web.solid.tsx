@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/collapsible.solid.tsx'
 import {
   Card,
+  clearComposer,
   Conversation,
   renderEntry,
   ScopedConversation,
@@ -47,7 +48,9 @@ import {
   writingAs,
 } from '@/sdk/solid'
 import { deadline } from '../../lib/timers.ts'
-import { QuestionPane } from '../inbox/ui.solid.tsx'
+import { settled as handled } from '../../lib/errors.ts'
+import { ItemFollowUp, QuestionPane } from '../inbox/ui.solid.tsx'
+import type { InboxItem } from '../inbox/ui.solid.tsx'
 import { MessagesDoc } from '../messages/refs.ts'
 import type { Reply } from '../questions/refs.ts'
 import {
@@ -62,6 +65,9 @@ import type { CardState, QuestionMessage } from '../questions/ui.solid.tsx'
 import { UnderUltimate, Unlisted } from '../sidebar/ui.solid.tsx'
 import { talkToUltimate } from '../subagents/ui.solid.tsx'
 import { SideChatSummaryEntry } from './entries.ts'
+import { createDraftGuard, DraftGuardRow } from './draft.solid.tsx'
+import type { SentDraft } from './draft.solid.tsx'
+import { AskAboutItem } from './item.solid.tsx'
 import { ComposerFrame, ease } from './frame.solid.tsx'
 import {
   contextSize,
@@ -74,6 +80,7 @@ import {
 import {
   DiscardAction,
   InjectAction,
+  ItemSidesDoc,
   OpenAction,
   QuestionSidesDoc,
   SideChatDoc,
@@ -242,22 +249,44 @@ function SidePane(props: {
       if (side !== undefined) document.getElementById(`composer-input-${side}`)?.focus()
     },
   )
+  const { guard, guarded, settle } = createDraftGuard(() => props.side)
+  const injectWith = async (
+    side: ConversationId,
+    draft: SentDraft | undefined,
+    args: { answer?: Reply },
+    keepalive = false,
+  ) => {
+    const result = await api.action(
+      InjectAction,
+      { id: side, ...args, ...(draft ? { draft: draft.text } : {}) },
+      { keepalive },
+    )
+    if (draft) clearComposer(side, draft)
+    return result
+  }
   const end = (how: 'discard' | 'inject') => {
-    const id = props.side
-    return sideEndings.end(id, how, () =>
-      api.action(how === 'inject' ? InjectAction : DiscardAction, { id }),
+    const side = props.side
+    return handled(
+      guarded(how, (draft) =>
+        sideEndings.end(side, how, () =>
+          how === 'inject' ? injectWith(side, draft, {}) : api.action(DiscardAction, { id: side }),
+        ),
+      ),
     )
   }
   const question = () => state()?.question
   const asker = () => state()?.of
-  const owner = () => (question() === undefined ? 'main' : 'the question')
+  const item = () => state()?.item
+  const readOnly = () => question() !== undefined || item() !== undefined
+  const owner = () =>
+    item() !== undefined ? 'the item' : question() === undefined ? 'main' : 'the question'
   return (
     <>
       <header class="flex h-11 shrink-0 items-center gap-2 border-b border-border/60 px-3">
         <GitForkIcon class="size-3.5 text-brand" />
         <span class="text-[13px] font-semibold">Side chat</span>
         <span class="truncate font-mono text-[11px] text-muted-foreground">
-          {question() === undefined
+          {!readOnly()
             ? 'temporary copy of @ultimate'
             : `read-only copy of #${asker()}${state()?.tokens ? ` · ${contextSize(state()!.tokens!)} context` : ''}`}
         </span>
@@ -273,20 +302,26 @@ function SidePane(props: {
         </Button>
       </header>
       <Show when={openedAt()}>
-        {(at) => <Cut at={at()} from={question() === undefined ? '@ultimate' : `#${asker()}`} />}
+        {(at) => <Cut at={at()} from={!readOnly() ? '@ultimate' : `#${asker()}`} />}
       </Show>
       <Show when={question()}>
         {(id) => (
           <PinnedQuestion
-            answerWith={(answer, keepalive) =>
-              api
-                .action(InjectAction, { id: props.side, answer }, { keepalive })
-                .catch((failure: unknown) => {
-                  throw new Error(
-                    `Nothing was sent: ${errorMessage(failure).replace(/^side-chat\/\w+: /, '')}`,
-                  )
-                })
-            }
+            answerWith={(answer, keepalive) => {
+              const side = props.side
+              return guarded(
+                'inject',
+                (draft, leaving) =>
+                  injectWith(side, draft, { answer }, keepalive || leaving).catch(
+                    (failure: unknown) => {
+                      throw new Error(
+                        `Nothing was sent: ${errorMessage(failure).replace(/^side-chat\/\w+: /, '')}`,
+                      )
+                    },
+                  ),
+                { departing: keepalive, onDeparture: 'include' },
+              )
+            }}
             keys={props.front && !props.phone}
             message={id()}
           />
@@ -302,64 +337,77 @@ function SidePane(props: {
             {error()}
           </p>
         </Show>
-        <div class="flex items-center gap-2">
-          <span class="mr-auto min-w-0 truncate font-mono text-[11px] text-muted-foreground">
-            {can().locked
-              ? 'This side chat changed things · summarize to keep main informed'
-              : props.phone
-                ? 'End it with'
-                : question() === undefined
-                  ? 'Main keeps running · end it with'
-                  : `#${asker()} waits for your answer · end it with`}
-          </span>
-          <Show when={can().discard}>
-            <Button
-              aria-label={`Discard side chat #${props.side}`}
-              class="text-muted-foreground"
-              data-agent-confirm="Discards this side chat without sending a summary."
-              disabled={ending() !== undefined}
-              onClick={() => void end('discard')}
-              size="sm"
-              title={
-                question() === undefined
-                  ? 'Throw it away; main never hears of it'
-                  : `Throw it away; #${asker()} never hears of it`
-              }
-              variant="ghost"
-            >
-              <Show when={ending() === 'discard'} fallback={<Trash2Icon />}>
-                <LoaderCircleIcon class="motion-safe:animate-spin" />
+        <Show
+          when={guard()}
+          fallback={
+            <div class="flex items-center gap-2">
+              <span class="mr-auto min-w-0 truncate font-mono text-[11px] text-muted-foreground">
+                {can().locked
+                  ? 'This side chat changed things · summarize to keep main informed'
+                  : props.phone
+                    ? 'End it with'
+                    : item() !== undefined
+                      ? 'Read-only · end it with'
+                      : question() === undefined
+                        ? 'Main keeps running · end it with'
+                        : `#${asker()} waits for your answer · end it with`}
+              </span>
+              <Show when={can().discard}>
+                <Button
+                  aria-label={`Discard side chat #${props.side}`}
+                  class="text-muted-foreground"
+                  data-agent-confirm="Discards this side chat without sending a summary."
+                  disabled={ending() !== undefined}
+                  onClick={() => void end('discard')}
+                  size="sm"
+                  title={
+                    !readOnly()
+                      ? 'Throw it away; main never hears of it'
+                      : `Throw it away; #${asker()} never hears of it`
+                  }
+                  variant="ghost"
+                >
+                  <Show when={ending() === 'discard'} fallback={<Trash2Icon />}>
+                    <LoaderCircleIcon class="motion-safe:animate-spin" />
+                  </Show>
+                  Discard
+                </Button>
               </Show>
-              Discard
-            </Button>
-          </Show>
-          <Button
-            aria-label={`Summarize side chat #${props.side}`}
-            class="border-brand/50 text-foreground hover:border-brand"
-            disabled={!can().inject || ending() !== undefined}
-            onClick={() => void end('inject')}
-            size="sm"
-            title={
-              question() !== undefined
-                ? `Send #${asker()} a summary without answering yet; answer on the card to send both`
-                : conversation().busy
-                  ? 'Stops the side chat, then sends main a summary'
-                  : 'Send main a summary it reads with its next input'
-            }
-            variant="outline"
-          >
-            <Show when={ending() === 'inject'} fallback={<SparklesIcon class="text-brand" />}>
-              <LoaderCircleIcon class="text-brand motion-safe:animate-spin" />
-            </Show>
-            {ending() === 'inject'
-              ? 'Summarizing…'
-              : error()
-                ? 'Retry summary'
-                : question() === undefined
-                  ? 'Summarize & inject'
-                  : 'Summarize only'}
-          </Button>
-        </div>
+              <Button
+                aria-label={`Summarize side chat #${props.side}`}
+                class="border-brand/50 text-foreground hover:border-brand"
+                disabled={!can().inject || ending() !== undefined}
+                onClick={() => void end('inject')}
+                size="sm"
+                title={
+                  item() !== undefined
+                    ? `Send #${asker()} a summary it reads with its next input, or @ultimate if #${asker()} is concluded`
+                    : question() !== undefined
+                      ? `Send #${asker()} a summary without answering yet; answer on the card to send both`
+                      : conversation().busy
+                        ? 'Stops the side chat, then sends main a summary'
+                        : 'Send main a summary it reads with its next input'
+                }
+                variant="outline"
+              >
+                <Show when={ending() === 'inject'} fallback={<SparklesIcon class="text-brand" />}>
+                  <LoaderCircleIcon class="text-brand motion-safe:animate-spin" />
+                </Show>
+                {ending() === 'inject'
+                  ? 'Summarizing…'
+                  : error()
+                    ? 'Retry summary'
+                    : item() !== undefined
+                      ? 'Summarize & send'
+                      : question() === undefined
+                        ? 'Summarize & inject'
+                        : 'Summarize only'}
+              </Button>
+            </div>
+          }
+        >
+          {(pending) => <DraftGuardRow guard={pending()} phone={props.phone} settle={settle} />}
+        </Show>
       </footer>
     </>
   )
@@ -479,10 +527,20 @@ function TalkItThrough(props: { message: QuestionMessage }) {
   )
 }
 
-function inboxSideChat(input: () => { message: QuestionMessage | undefined; phone: boolean }) {
+function inboxSideChat(
+  input: () => {
+    message: QuestionMessage | undefined
+    item?: InboxItem
+    phone: boolean
+  },
+) {
   const sides = useDocOf(() => ROOT, QuestionSidesDoc)
+  const itemSides = useDocOf(() => ROOT, ItemSidesDoc)
   const [front, setFront] = useSideChatFront()
-  const side = () => sides()?.sides.find((item) => item.id === front() && item.ended === undefined)
+  const side = () =>
+    [...(sides()?.sides ?? []), ...(itemSides()?.sides ?? [])].find(
+      (item) => item.id === front() && item.ended === undefined,
+    )
   const index = useDocOf(() => side()?.of, SideChatsDoc)
   const sideId = createMemo(() => side()?.id)
   return createMemo(() => {
@@ -551,7 +609,8 @@ function Cut(props: { at: number; from: string }) {
 
 const SummaryCard = renderEntry(SideChatSummaryEntry, function SummaryCard(props) {
   const data = () => props.entry.data
-  const index = useDocOf(() => data().to, SideChatsDoc)
+  const side = useDocOf(() => data().side, SideChatDoc)
+  const index = useDocOf(() => side()?.of ?? data().to, SideChatsDoc)
   const openedAt = () => index()?.sides.find((item) => item.id === data().side)?.openedAt
   const at = () => props.entry.model?.[0]?.timestamp
   return (
@@ -641,10 +700,13 @@ function SideRows(props: { conversation: ConversationId | undefined }) {
 function sideIds(main: () => ConversationId | undefined) {
   const index = useDocOf(main, SideChatsDoc)
   const questions = useDocOf(() => ROOT, QuestionSidesDoc)
+  const items = useDocOf(() => ROOT, ItemSidesDoc)
   return createMemo(
     () =>
       new Set(
-        [...(index()?.sides ?? []), ...(questions()?.sides ?? [])].map((side) => Number(side.id)),
+        [...(index()?.sides ?? []), ...(questions()?.sides ?? []), ...(items()?.sides ?? [])].map(
+          (side) => Number(side.id),
+        ),
       ),
   )
 }
@@ -658,6 +720,7 @@ export default defineWebExtension({
     provide(Unlisted, sideIds),
     provide(CardActions, TalkItThrough),
     provide(QuestionPane, inboxSideChat),
+    provide(ItemFollowUp, AskAboutItem),
     provide(EmptyTranscript, QuestionSideStart),
   ],
 })

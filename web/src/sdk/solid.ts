@@ -20,7 +20,9 @@ export {
   writingAs,
 } from './hooks.ts'
 export {
+  clearComposer,
   closePanel,
+  composerDraft,
   composerImages,
   covered,
   fillComposer,

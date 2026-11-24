@@ -53,6 +53,7 @@ vi.mock('../../web/src/sdk/client.ts', async () => {
 })
 
 import { getDraft } from '../../web/src/app/drafts.ts'
+import { clearComposer, composerDraft, fillComposer } from '../../web/src/sdk/solid.ts'
 import { Composer } from '../../web/src/app/composer.solid.tsx'
 import { Dock, StatusLine } from '../../web/src/app/shell.solid.tsx'
 import { registry, store, uiState } from '../../web/src/sdk/client.ts'
@@ -98,6 +99,29 @@ async function act(steps: { ref: string; action: string; args?: unknown[] }[]) {
 }
 
 const submits = () => harness.posts.filter((post) => post.path.endsWith('/submit'))
+
+it('reads an unsent composer snapshot without trimming its text', () => {
+  expect(composerDraft(7001)).toBeUndefined()
+  fillComposer(7001, '  a draft\n')
+  expect(composerDraft(7001)).toEqual({
+    text: '  a draft\n',
+    revision: 1,
+    images: 0,
+    files: 0,
+  })
+})
+
+it('clears only the sent composer text, leaving later edits and attachments', () => {
+  fillComposer(7002, 'sent')
+  const sent = composerDraft(7002)!
+  const images = [{ data: 'AA==', mimeType: 'image/png' }]
+  getDraft(7002).set({ images })
+  clearComposer(7002, sent)
+  expect(getDraft(7002).get()).toMatchObject({ text: '', images })
+  fillComposer(7002, 'later')
+  clearComposer(7002, sent)
+  expect(getDraft(7002).get()).toMatchObject({ text: 'later', images })
+})
 
 it('sends what an agent types as the agent’s, and clears the draft', async () => {
   await show(7)

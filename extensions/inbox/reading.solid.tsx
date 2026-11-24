@@ -24,6 +24,7 @@ import {
   tagOf,
 } from './items.ts'
 import type { Entry } from './items.ts'
+import { ItemFollowUp } from './points.ts'
 
 export function Reading(props: { entry: Entry; now: number; phone: boolean; onBack: () => void }) {
   const message = () => props.entry.message
@@ -144,7 +145,24 @@ export function Reading(props: { entry: Entry; now: number; phone: boolean; onBa
             </Show>
           </div>
           <div class={props.phone ? 'mt-5' : 'mt-6'}>
-            <Show when={message()} fallback={props.entry.item?.pane}>
+            <Show
+              when={message()}
+              fallback={
+                <>
+                  {props.entry.item?.pane}
+                  <Show when={props.entry.item?.conversation !== undefined && props.entry.item}>
+                    {(item) => (
+                      <div
+                        class="mbs-8 flex flex-col gap-2 border-t border-border/60 pbs-5 empty:hidden"
+                        data-item-follow-up
+                      >
+                        <Provided input={item()} point={ItemFollowUp} />
+                      </div>
+                    )}
+                  </Show>
+                </>
+              }
+            >
               {(question) => (
                 <div class="overflow-hidden rounded-lg border border-border/70 bg-card/60">
                   <Provided input={{ message: question() }} point={MessageExtras} />

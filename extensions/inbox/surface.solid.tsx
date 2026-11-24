@@ -19,7 +19,7 @@ export function Inbox() {
   const paneFailures = (<span class="contents" />) as HTMLElement
   const takeover = useProvided(
     QuestionPane,
-    () => ({ message: item()?.message, phone: phone() }),
+    () => ({ message: item()?.message, item: item()?.item, phone: phone() }),
     paneFailures,
   )
   const reading = () => takeover() != null || (!!item() && !!selected()?.open)

@@ -10,10 +10,10 @@ actions of its own.
 
 Another extension puts its own things to do in the Inbox (a command to run in a terminal, say) by providing the
 `InboxItems` point from its `web.solid.tsx`: `provide(InboxItems, () => items)`, where `items` is an accessor of
-`{ key, at, conversation?, tag, title, gist?, pane }[]`. `key` is unique across providers (`shell:12`), `at` when it
+`{ key, at, conversation?, tag, title, gist?, text?, pane }[]`. `key` is unique across providers (`shell:12`), `at` when it
 started waiting, `tag` the row's kind tag, `title` one line of inline Markdown (rendered without images in the
 reading pane, text only in the list), `pane` the reading pane's content below the title, its buttons included;
-with `conversation` the row names it and the pane offers **Open in branch**. Every provider's items count in the
+with `conversation` the row names it and the pane offers **Open in branch**. Optional `text` is the item's full Markdown context for a follow-up side chat. Every provider's items count in the
 sidebar row and the To-dos' "For you" row too: they all read `Waiting` from `ui.solid.tsx`. A provider that throws is left
 out behind its inline error card. Items are entries keyed by string; a question's key is `message:<id>`.
 
@@ -30,7 +30,7 @@ out behind its inline error card. Items are entries keyed by string; a question'
   providing `QuestionPane` (`ui.solid.tsx`) may take the pane over: side-chat shows the question's or item's side chat there
   while it is in front. A provided item with a `conversation` gets the `ItemFollowUp` point under its pane: side-chat
   puts an "Ask #id about this…" input there, which opens a read-only side chat on that conversation (see side-chat's
-  README). When the shown item leaves, the one that took its place, the next oldest, shows.
+  README). Follow-ups sit below a separate divider, only when a provider renders one. When the shown item leaves, the one that took its place, the next oldest, shows.
 - **Keys** (desktop): `j`/`k` move the selection, `⇧O` opens the branch (plain `o` is the card's "Something else…"),
   and the card's own keys (1–9, letters, ↵, ⇧↵) answer the shown item: the Inbox passes `keys` to the card. A
   branch's transcript keeps its own rule (`keyCard`) when the Inbox is not on screen.
