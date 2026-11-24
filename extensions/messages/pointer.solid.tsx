@@ -3,7 +3,7 @@ import { MessageCircleQuestion, SquareArrowOutUpRight } from '@lucide/solid'
 import { Show, createMemo } from 'solid-js'
 import { Button } from '@/components/ui/button.solid.tsx'
 import { Card, ROOT, cn, useConversation, useDocOf } from '@/sdk/solid'
-import { openMessage, useAccentOf } from './card-parts.solid.tsx'
+import { openMessage, Stamp, useAccentOf } from './card-parts.solid.tsx'
 import { openQuestion } from './data.ts'
 import { AnsweredEntry, AskedEntry } from './entries.ts'
 import { MessagesDoc } from './refs.ts'
@@ -21,20 +21,19 @@ export function QuestionPointer(props: { entry: EntryRecord }) {
 function Pointer(props: { asked: QuestionNotice }) {
   const conversation = useConversation()
   const log = useDocOf(() => ROOT, MessagesDoc)
-  const outcome = createMemo(
-    () =>
-      conversation()
-        .entries.filter((candidate) => AnsweredEntry.is(candidate))
-        .find((entry) => entry.data.message === props.asked.message)?.data,
-  )
-  const open = () => {
-    const message = log()?.messages.find((item) => item.id === props.asked.message)
-    return !outcome() && !!message && openQuestion(message)
-  }
+  const outcome = createMemo(() => {
+    const id = props.asked.message
+    return conversation()
+      .entries.filter((candidate) => AnsweredEntry.is(candidate))
+      .findLast((entry) => entry.data.message === id)?.data
+  })
+  const message = createMemo(() => log()?.messages.find((item) => item.id === props.asked.message))
+  const open = () => !!message() && openQuestion(message()!)
   const accent = useAccentOf(() => props.asked.from)
   const state = () => {
     const result = outcome()
     if (!result) return undefined
+    if (open()) return 'partly answered'
     return `${result.dismissed ? 'dismissed' : 'answered'}${result.via ? ' for you' : ''}`
   }
   const text = () =>
@@ -68,9 +67,12 @@ function Pointer(props: { asked: QuestionNotice }) {
           <Show when={text()}>
             <span class="min-w-0 flex-1 truncate">{text()}</span>
           </Show>
-          <span class="ml-auto flex shrink-0 items-center gap-1">
-            <SquareArrowOutUpRight class="size-3" />
-            Open
+          <span class="ms-auto flex shrink-0 items-center gap-2">
+            <Show when={message()}>{(asked) => <Stamp at={asked().at} label="Asked" />}</Show>
+            <span class="flex items-center gap-1">
+              <SquareArrowOutUpRight class="size-3" />
+              Open
+            </span>
           </span>
         </Button>
       </header>

@@ -11,7 +11,7 @@ import { ContributionError } from './contribution-error.solid.tsx'
 export function MessageActions(props: {
   entry: EntryRecord
   text: string
-  timestamp: number
+  timestamp?: number
   class?: string
   bubble?: boolean
   name?: string
@@ -23,7 +23,6 @@ export function MessageActions(props: {
     conversation: props.entry.conversationId,
     id: props.entry.id,
   }))
-  const date = () => new Date(props.timestamp)
   const failed = (extension: string, error: unknown) => (
     <ContributionError error={error} extension={extension} inline />
   )
@@ -39,9 +38,17 @@ export function MessageActions(props: {
       <For each={details()} keyed={(item) => item.key}>
         {(item) => <Contribution fallback={failed} item={item()} props={{ entry: props.entry }} />}
       </For>
-      <time class="tabular-nums" datetime={date().toISOString()} title={date().toLocaleString()}>
-        {formatTime(date())}
-      </time>
+      <Show when={props.timestamp !== undefined && new Date(props.timestamp)}>
+        {(date) => (
+          <time
+            class="tabular-nums"
+            datetime={date().toISOString()}
+            title={date().toLocaleString()}
+          >
+            {formatTime(date())}
+          </time>
+        )}
+      </Show>
       <Show when={props.text}>
         <CopyButton label={`Copy ${props.name ?? `message #${props.entry.id}`}`} value={props.text}>
           <Copy />

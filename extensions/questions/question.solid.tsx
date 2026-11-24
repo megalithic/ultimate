@@ -101,6 +101,7 @@ export function QuestionItem(props: {
   messageId: number
   draft: Draft | undefined
   current: boolean
+  sent?: boolean
   disabled: boolean
   hints: boolean
   onOpen: () => void
@@ -111,6 +112,7 @@ export function QuestionItem(props: {
   const list = createMemo(() => choices(props.question))
   const [active, setActive] = createSignal<number>()
   const words = createMemo(() => answerOf(props.question, props.draft))
+  const line = () => props.question.text.split('\n')[0]
   const number = () => position(props.question, props.index)
   const name = () => `question ${number()} · message ${props.messageId}`
   const multi = () => props.question.kind === 'multi'
@@ -137,6 +139,22 @@ export function QuestionItem(props: {
             .join(',')
     return `${number()}${keys}`
   }
+  const badge = () => (
+    <span
+      class={cn(
+        'flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] transition-colors duration-200',
+        words()
+          ? 'bg-brand/15 text-brand'
+          : props.current
+            ? 'border border-foreground/30 text-foreground'
+            : 'border border-dashed border-muted-foreground/40 text-muted-foreground',
+      )}
+    >
+      <Show when={words() && !props.current} fallback={number()}>
+        <Check stroke-width={3} class={cn(mark, 'size-2.5')} />
+      </Show>
+    </span>
+  )
   const field = (placeholder: string, focus = false) => (
     <Field
       value={props.draft?.text ?? ''}
@@ -230,60 +248,56 @@ export function QuestionItem(props: {
         props.current ? 'border-border/80 bg-background/50' : 'border-transparent',
       )}
     >
-      <legend class="sr-only">{props.question.text}</legend>
-      <Button
-        aria-label={`Open ${name()}: ${props.question.text}`}
-        aria-expanded={props.current ? 'true' : 'false'}
-        tabindex={props.current ? -1 : 0}
-        disabled={props.disabled}
-        onClick={() => props.onOpen()}
-        class={cn(
-          'flex h-auto w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left font-normal whitespace-normal',
-          ring,
-          props.current ? 'cursor-default' : 'hover:bg-muted/40',
-        )}
-        size={null}
-        variant={null}
-      >
-        <span
-          class={cn(
-            'flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] transition-colors duration-200',
-            words()
-              ? 'bg-brand/15 text-brand'
-              : props.current
-                ? 'border border-foreground/30 text-foreground'
-                : 'border border-dashed border-muted-foreground/40 text-muted-foreground',
-          )}
-        >
-          <Show when={words() && !props.current} fallback={number()}>
-            <Check stroke-width={3} class={cn(mark, 'size-2.5')} />
-          </Show>
-        </span>
-        <span
-          class={cn(
-            'min-w-0 text-[13px] leading-snug',
-            props.current ? 'flex-1 text-foreground' : 'shrink truncate text-foreground/85',
-          )}
-        >
-          {props.question.text}
-        </span>
-        <Show when={!props.current}>
-          <span
+      <legend class="sr-only">{line()}</legend>
+      <Show
+        when={props.current}
+        fallback={
+          <Button
+            aria-label={`Open ${name()}: ${line()}`}
+            aria-expanded="false"
+            disabled={props.disabled}
+            onClick={() => props.onOpen()}
             class={cn(
-              'ml-auto flex min-w-0 shrink-[2] items-center gap-1.5 font-mono text-[11px]',
-              words() ? 'text-muted-foreground' : 'text-muted-foreground/60',
+              'flex h-auto w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left font-normal whitespace-normal hover:bg-muted/40',
+              ring,
             )}
+            size={null}
+            variant={null}
           >
-            <Show when={words()} fallback={<span class="whitespace-nowrap">not answered</span>}>
-              <span class="shrink-0 text-brand">{tag()}</span>
-              <span class="truncate font-sans text-xs text-foreground/80">{words()}</span>
-            </Show>
-          </span>
-        </Show>
-        <Show when={props.current && multi()}>
-          <span class="shrink-0 font-mono text-[11px] text-muted-foreground">pick any</span>
-        </Show>
-      </Button>
+            {badge()}
+            <span class="min-w-0 shrink truncate text-[13px] leading-snug text-foreground/85">
+              {line()}
+            </span>
+            <span
+              class={cn(
+                'ms-auto flex min-w-0 shrink-[2] items-center gap-1.5 font-mono text-[11px]',
+                words() ? 'text-muted-foreground' : 'text-muted-foreground/60',
+              )}
+            >
+              <Show when={words()} fallback={<span class="whitespace-nowrap">not answered</span>}>
+                <span class="shrink-0 text-brand">{tag()}</span>
+                <span class="truncate font-sans text-xs text-foreground/80">{words()}</span>
+                <Show when={props.sent}>
+                  <span class="shrink-0">· sent</span>
+                </Show>
+              </Show>
+            </span>
+          </Button>
+        }
+      >
+        <div class="flex w-full items-start gap-2.5 px-2.5 py-2">
+          {badge()}
+          <Markdown
+            class="min-w-0 flex-1 py-px text-[13px]! leading-snug! tracking-normal! text-foreground [font-feature-settings:'cv11','ss03']!"
+            text={props.question.text}
+          />
+          <Show when={multi()}>
+            <span class="flex h-5 shrink-0 items-center font-mono text-[11px] text-muted-foreground">
+              pick any
+            </span>
+          </Show>
+        </div>
+      </Show>
       <div
         class={cn(
           'grid transition-[grid-template-rows] duration-200 ease-out',

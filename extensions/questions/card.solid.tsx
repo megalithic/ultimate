@@ -1,6 +1,6 @@
 import type { JSX } from '@solidjs/web'
 import { MessageCircleQuestion } from '@lucide/solid'
-import { createMemo, createSignal, For, onSettled, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'solid-js'
 import { Button } from '@/components/ui/button.solid.tsx'
 import { Form } from '@/components/ui/form.solid.tsx'
 import { Input, Textarea } from '@/components/ui/input.solid.tsx'
@@ -38,6 +38,8 @@ import {
   choiceForKey,
   choices,
   keyOf,
+  pickDraft,
+  sentDraft,
 } from './state.ts'
 import type { CardState, Draft } from './state.ts'
 
@@ -154,21 +156,51 @@ function AnswerCard(props: CardProps & { id: number }) {
   let committed = false
   const [phase, setPhase] = createSignal<Phase>('answering')
   const [heldDraft, setHeldDraft] = createSignal<Pick<CardState, 'drafts' | 'note'>>()
-  const drafts = () => heldDraft()?.drafts ?? state().drafts
+  const sent = createMemo(() =>
+    Object.fromEntries(
+      Object.entries(props.message.answered ?? {}).flatMap(([index, given]) => {
+        const question = questions()[Number(index)]
+        return question ? [[index, sentDraft(question, given)]] : []
+      }),
+    ),
+  )
+  const unsent = createMemo(() =>
+    Object.fromEntries(
+      Object.entries(heldDraft()?.drafts ?? state().drafts).filter(([index]) => !(index in sent())),
+    ),
+  )
+  const drafts = createMemo(() => ({ ...unsent(), ...sent() }))
   const note = () => heldDraft()?.note ?? state().note
-  const current = () => state().current
-  const ready = createMemo(() => answered(questions(), drafts()))
+  const openAt = createMemo(() =>
+    questions().flatMap((_, index) => (index in sent() ? [] : [index])),
+  )
+  const current = () => (state().current in sent() ? (openAt()[0] ?? 0) : state().current)
+  const ready = createMemo(() => answered(questions(), unsent()))
+  const [sentReply, setSentReply] = createSignal<number>()
+  createEffect(
+    () => messages()?.messages.some((message) => message.id === sentReply()),
+    (replyInLog) => {
+      if (!replyInLog) return
+      setSentReply(undefined)
+      committed = false
+      setHeldDraft(undefined)
+      setPhase('answering')
+    },
+  )
   const locked = () => phase() !== 'answering'
   const disabled = () => busy() || locked()
   const word = (i: number) => answerOf(questions()[i], drafts()[i])
-  const left = () => questions().length - ready().length
-  const beforeLast = () => current() < questions().length - 1
+  const left = () => openAt().length - ready().length
+  const nextOpen = (from: number, step: 1 | -1) =>
+    step > 0 ? openAt().find((index) => index > from) : openAt().findLast((index) => index < from)
+  const beforeLast = () => nextOpen(current(), 1) !== undefined
+  const picksLeft = () => openAt().some((index) => !word(index) && pickDraft(questions()[index]))
   const sendLabel = () =>
     props.sendLabel ??
     (!ready().length && note().trim()
       ? 'Send note'
-      : left() && ready().length
-        ? `Send ${ready().length} of ${questions().length}`
+      : left()
+        ? `Send ${ready().length} of ${openAt().length}`
         : 'Send')
 
   const go = (index: number, automatic = false) => {
@@ -182,6 +214,7 @@ function AnswerCard(props: CardProps & { id: number }) {
           ?.focus({ preventScroll: true }),
       )
   }
+  const move = (step: 1 | -1) => go(nextOpen(current(), step) ?? current())
   const draft = (index: number, edit: (old: Draft) => Draft, typed = false) =>
     change(
       (old) => ({
@@ -193,7 +226,7 @@ function AnswerCard(props: CardProps & { id: number }) {
   const select = (index: number, option: number, click = false, pressed?: boolean) => {
     const question = questions()[index]
     const choice = question && choices(question)[option]
-    if (!choice) return
+    if (!choice || index in sent()) return
     change((old) => {
       const previous = old.drafts[index] ?? { chosen: [] }
       const on = pressed ?? !(choice.custom ? previous.other : previous.chosen.includes(option))
@@ -211,8 +244,9 @@ function AnswerCard(props: CardProps & { id: number }) {
       return { ...old, current: index, drafts: { ...old.drafts, [index]: next } }
     })
     advance?.()
-    if (question.kind !== 'multi' && click && !choice.custom && index < questions().length - 1)
-      advance = deadline(CHECK_LANDING_BEFORE_ADVANCE_MS, go.bind(null, index + 1, true))
+    const after = nextOpen(index, 1)
+    if (question.kind !== 'multi' && click && !choice.custom && after !== undefined)
+      advance = deadline(CHECK_LANDING_BEFORE_ADVANCE_MS, go.bind(null, after, true))
   }
   const unlock = () => {
     committed = false
@@ -229,14 +263,24 @@ function AnswerCard(props: CardProps & { id: number }) {
     waiting?.cancel()
     waiting?.fire()
   }
-  const send = (immediately = false, source?: string) => {
+  const send = (immediately = false, source?: string) => sendDrafts(unsent(), immediately, source)
+  const acceptPicks = () => {
+    const picked = { ...unsent() }
+    for (const index of openAt()) {
+      const pick = word(index) ? undefined : pickDraft(questions()[index])
+      if (pick) picked[index] = pick
+    }
+    change((old) => ({ ...old, drafts: { ...old.drafts, ...picked } }))
+    sendDrafts(picked, true)
+  }
+  const sendDrafts = (open: Record<number, Draft>, immediately: boolean, source?: string) => {
     const extra = note().trim()
-    const answers = ready()
+    const answers = answered(questions(), open)
     if ((!answers.length && !extra) || committed || busy()) return
     const reply = answerRequest()
     committed = true
     advance?.()
-    setHeldDraft({ drafts: drafts(), note: note() })
+    setHeldDraft({ drafts: open, note: note() })
     const answer = { answers, ...(extra ? { note: extra } : {}) }
     const outlivesPage =
       new TextEncoder().encode(JSON.stringify(answer)).byteLength <= KEEPALIVE_BYTES
@@ -245,7 +289,12 @@ function AnswerCard(props: CardProps & { id: number }) {
       setPhase('sending')
       setError(undefined)
       writingAs(source, () => reply(answer, outlivesPage)).then(
-        () => setPhase('sent'),
+        (sentMessage) => {
+          setPhase('sent')
+          change((old) => ({ ...old, note: '' }), true)
+          const id = (sentMessage as { id?: unknown } | undefined)?.id
+          if (typeof id === 'number') setSentReply(id)
+        },
         (failure: unknown) => {
           unlock()
           setError(errorMessage(failure))
@@ -261,7 +310,7 @@ function AnswerCard(props: CardProps & { id: number }) {
   const enter = () => {
     if (phase() === 'undo') return flushAnswer()
     if (locked()) return
-    if (beforeLast()) go(current() + 1)
+    if (beforeLast() && left()) move(1)
     else send()
   }
   const fieldKey = (event: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
@@ -269,7 +318,7 @@ function AnswerCard(props: CardProps & { id: number }) {
     if (event.key === 'Enter') {
       event.preventDefault()
       event.stopPropagation()
-      if (event.shiftKey) send(true)
+      if (event.shiftKey) acceptPicks()
       else enter()
     } else if (event.key === 'Escape') {
       event.preventDefault()
@@ -277,7 +326,7 @@ function AnswerCard(props: CardProps & { id: number }) {
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       event.currentTarget.blur()
-      go(current() + (event.key === 'ArrowDown' ? 1 : -1))
+      move(event.key === 'ArrowDown' ? 1 : -1)
     }
   }
   const onKey = (event: KeyboardEvent) => {
@@ -311,12 +360,12 @@ function AnswerCard(props: CardProps & { id: number }) {
       select(current(), choice)
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
-      go(current() + (event.key === 'ArrowDown' ? 1 : -1))
+      move(event.key === 'ArrowDown' ? 1 : -1)
     } else if (event.key === 'Enter') {
       event.preventDefault()
-      if (event.shiftKey) send(true)
+      if (event.shiftKey) acceptPicks()
       else enter()
-    } else if (event.key === 'Escape' && question && word(current())) {
+    } else if (event.key === 'Escape' && question && word(current()) && !(current() in sent())) {
       event.preventDefault()
       advance?.()
       draft(current(), () => ({ chosen: [] }))
@@ -384,7 +433,7 @@ function AnswerCard(props: CardProps & { id: number }) {
           <Show when={questions().length > 1}>
             <span class="ml-auto flex items-center gap-2">
               <span>
-                {ready().length}/{questions().length}
+                {questions().length - openAt().length + ready().length}/{questions().length}
               </span>
               <span class="flex items-center gap-1" aria-hidden="true">
                 <For each={questions()} keyed={false}>
@@ -411,7 +460,8 @@ function AnswerCard(props: CardProps & { id: number }) {
                   messageId={props.id}
                   draft={drafts()[index]}
                   current={index === current()}
-                  disabled={disabled()}
+                  sent={index in sent()}
+                  disabled={disabled() || index in sent()}
                   hints={hints()}
                   onOpen={() => go(index)}
                   onSelect={(option, pressed) => select(index, option, true, pressed)}
@@ -479,11 +529,16 @@ function AnswerCard(props: CardProps & { id: number }) {
               </Show>
               <span class="flex items-center gap-1">
                 <Key>↵</Key>
-                {beforeLast() ? 'next' : 'send'}
+                {beforeLast() && left() ? 'next' : 'send'}
               </span>
-              <Show when={questions()[current()] && word(current())}>
+              <Show when={questions()[current()] && word(current()) && !(current() in sent())}>
                 <span class="flex items-center gap-1">
                   <Key>esc</Key> clear
+                </span>
+              </Show>
+              <Show when={picksLeft()}>
+                <span class="flex items-center gap-1">
+                  <Key>⇧↵</Key> accept picks
                 </span>
               </Show>
             </span>

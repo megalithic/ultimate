@@ -1,13 +1,13 @@
 import type { ConversationId, EntryRecord } from '@earendil-works/pi-durable'
 import { CornerDownRight } from '@lucide/solid'
 import type { JSX } from '@solidjs/web'
-import { Show, createMemo } from 'solid-js'
-import { MessageActions, UserText, ROOT, cn, formatAgo, useDocOf, useNow } from '@/sdk/solid'
+import { For, Show, createMemo } from 'solid-js'
+import { MessageActions, UserText, ROOT, cn, useDocOf } from '@/sdk/solid'
 import { AgentMark, AgentTitle } from '../conversations/ui.solid.tsx'
 import { accentOf } from './accent.ts'
 import { Address } from './address.solid.tsx'
-import { Body, Navigate, openMessage, useAccentOf } from './card-parts.solid.tsx'
-import { answerTo, sentStatus } from './data.ts'
+import { Body, Navigate, openMessage, Stamp, useAccentOf } from './card-parts.solid.tsx'
+import { sentStatus } from './data.ts'
 import { MessageImages } from './message-images.solid.tsx'
 import { MessagesDoc } from './refs.ts'
 import type { Message } from './refs.ts'
@@ -26,10 +26,13 @@ export function Bubble(props: {
   const accent = useAccentOf(() => props.from)
   const status = () => sentStatus(props.message, props.running)
   const writing = () => props.running && !props.message && !props.text
-  const answer = createMemo(() => {
-    const message = props.message
-    return message && answerTo(log()?.messages ?? [], message)
-  })
+  const answers = createMemo(() =>
+    props.message
+      ? (log()?.messages ?? []).filter(
+          (message) => message.from === 'user' && message.re === props.message!.id,
+        )
+      : [],
+  )
   const attention = () => {
     const state = status()
     return state === 'sending'
@@ -47,7 +50,7 @@ export function Bubble(props: {
     >
       <BubbleHeader
         message={props.message?.id}
-        at={props.at ?? props.message?.at}
+        at={props.message?.at ?? props.at}
         entry={props.entry}
         from={props.from}
         text={props.text}
@@ -68,9 +71,14 @@ export function Bubble(props: {
           {(images) => <MessageImages conversation={props.from} entry={images().entry} />}
         </Show>
         {props.children}
-        <Show when={answer()}>
-          {(reply) => <AttachedAnswer answer={reply()} question={props.message!} />}
-        </Show>
+        <For each={answers()} keyed={(reply) => reply.id}>
+          {(reply, index) => (
+            <AttachedAnswer
+              answer={reply()}
+              dismissal={props.message?.state === 'dismissed' && index() === answers().length - 1}
+            />
+          )}
+        </For>
         <Show when={attention() || props.message?.error}>
           <footer class="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
             <Show when={attention()}>
@@ -128,14 +136,7 @@ export function BubbleHeader(props: {
           </span>
         )}
       </Show>
-      <Show
-        when={props.entry}
-        fallback={
-          <Show when={props.at !== undefined}>
-            <Time at={props.at!} class="ml-auto shrink-0" />
-          </Show>
-        }
-      >
+      <Show when={props.entry}>
         {(entry) => (
           <MessageActions
             bubble
@@ -143,30 +144,20 @@ export function BubbleHeader(props: {
             entry={entry()}
             name={props.message === undefined ? undefined : `board message #${props.message}`}
             text={props.text ?? ''}
-            timestamp={time()}
+            timestamp={props.message === undefined ? time() : undefined}
           />
         )}
+      </Show>
+      <Show when={props.at !== undefined && (props.message !== undefined || !props.entry)}>
+        <Stamp at={props.at!} class={props.entry ? undefined : 'ms-auto'} />
       </Show>
     </header>
   )
 }
 
-function Time(props: { at: number; class: string }) {
-  const now = useNow(60_000)
-  return (
-    <time
-      class={props.class}
-      datetime={new Date(props.at).toISOString()}
-      title={new Date(props.at).toLocaleString()}
-    >
-      {formatAgo(props.at, now())}
-    </time>
-  )
-}
-
-function AttachedAnswer(props: { answer: Message; question: Message }) {
+function AttachedAnswer(props: { answer: Message; dismissal: boolean }) {
   const accent = accentOf('user')
-  const dismissed = () => props.question.state === 'dismissed'
+  const dismissed = () => props.dismissal
   const via = () => props.answer.via
   const settled = () => (dismissed() ? 'dismissed' : 'answered')
   const label = () =>
@@ -191,7 +182,11 @@ function AttachedAnswer(props: { answer: Message; question: Message }) {
             from your message
           </Navigate>
         </Show>
-        <Time at={props.answer.at} class="ml-auto" />
+        <Stamp
+          at={props.answer.at}
+          class="ms-auto"
+          label={dismissed() ? 'Dismissed' : 'Answered'}
+        />
       </div>
       <Show when={!dismissed() || via()}>
         <UserText

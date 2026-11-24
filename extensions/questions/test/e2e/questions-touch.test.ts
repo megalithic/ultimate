@@ -69,9 +69,14 @@ it('sends the answer when a phone tap lands on the edge of Send', async () => {
   cleanup.push(() => browser.close())
   const page = await browser.newPage({ ...devices['Pixel 7'] })
   await page.goto(`${server.url}/?inbox=${id}`)
-  const send = page
-    .locator(`[data-questions-card="message:${id}"]`)
-    .getByRole('button', { name: `Send: answer to message ${id}`, exact: true })
+  const card = page.locator(`[data-questions-card="message:${id}"]`)
+  await card
+    .getByRole('button', {
+      name: `Option 1 · Go, send it · question 1 · message ${id}`,
+      exact: true,
+    })
+    .tap()
+  const send = card.getByRole('button', { name: `Send: answer to message ${id}`, exact: true })
   await send.waitFor()
   const box = (await send.boundingBox())!
   const finger = [{ x: box.x + box.width / 2, y: box.y + box.height + 4, radiusX: 8, radiusY: 8 }]

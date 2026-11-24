@@ -5,7 +5,8 @@ import { Show } from 'solid-js'
 import { Shimmer } from '@/components/ai/shimmer.solid.tsx'
 import { Markdown } from '@/components/markdown/markdown.solid.tsx'
 import { Button } from '@/components/ui/button.solid.tsx'
-import { Provided, cn, events, showSurface, switchConversation } from '@/sdk/solid'
+import { Provided, cn, events, showSurface, switchConversation, useNow } from '@/sdk/solid'
+import { formatFullTime, formatStamp } from '@/sdk/format.ts'
 import { accentOf } from './accent.ts'
 import { MessageAnswers, MessageExtras } from './points.ts'
 import type { Message } from './refs.ts'
@@ -14,6 +15,19 @@ import { useStandingName } from './standing-name.solid.tsx'
 export function useAccentOf(id: () => ConversationId | 'user' | 'remote') {
   const name = useStandingName(id)
   return () => accentOf(name() === 'ultimate' ? 'ultimate' : id())
+}
+
+export function Stamp(props: { at: number; label?: string; class?: string }) {
+  const now = useNow(60_000)
+  return (
+    <time
+      class={cn('shrink-0 tabular-nums', props.class)}
+      datetime={new Date(props.at).toISOString()}
+      title={props.label ? `${props.label} ${formatFullTime(props.at)}` : formatFullTime(props.at)}
+    >
+      {formatStamp(props.at, now())}
+    </time>
+  )
 }
 
 export function Body(props: { text: string; pending?: string; class?: string }) {

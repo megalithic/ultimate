@@ -50,7 +50,7 @@ shows beside the options for the hovered or chosen one. Recommended options (@ul
 a brand-tinted border but start unchosen: nothing counts as answered until the user chooses, and the preview shows the
 pick until then. ⇧↵ accepts the picks: it chooses them on every open question still unanswered and sends at once. Under the questions,
 a note field is always there: whatever it holds goes after the answer lines, or on its own (“Send note”), and never
-changes a pick. Send sends what is answered (“Send 2 of 5”). Sending locks the card as it is and turns Send into
+changes a pick. Send sends what is answered (“Send 2 of 5”); even one unanswered question reads “Send 0 of 1”. Sending locks the card as it is and turns Send into
 **Undo**, which fills over a 3 s window before the answer goes out; Undo keeps the picks and the note. Holding Send for
 1 s fills it and sends at once, with no window; released earlier it is a plain click. While questions stay open after
 a send, the card comes back with the answered ones folded as `· sent` (locked; the keys and Enter skip them), the note
@@ -68,7 +68,8 @@ card, on another control or in the panel, whose cards take no global keys.
 
 What the user picked and typed on a card lives in durable UI state, by message (`ext.questions.cards`), so leaving a
 surface for another, a reload or another window or device shows it again where they left it; it goes as soon as the
-message settles (answered, dismissed, or settled for them by @ultimate).
+message settles (answered, dismissed, or settled for them by @ultimate). The message, each attached reply and
+@ultimate's question pointer show local-time stamps, with the full date on hover; every reply stays on the card.
 
 ## Where open questions wait
 

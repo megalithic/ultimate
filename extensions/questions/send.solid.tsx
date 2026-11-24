@@ -76,7 +76,7 @@ export function SendButton(props: {
       title={
         undo()
           ? 'Take your answer back; your picks and note stay'
-          : 'Click to send with a moment to undo; hold (or ⇧↵) to send at once'
+          : 'Click to send with a moment to undo; hold to send at once'
       }
       onPointerDown={(event) => {
         heldClick = false

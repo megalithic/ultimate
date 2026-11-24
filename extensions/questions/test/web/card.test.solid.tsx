@@ -94,7 +94,8 @@ beforeEach(async () => {
   harness.sources[0].open()
   await vi.advanceTimersByTimeAsync(10)
 })
-afterEach(() => {
+afterEach(async () => {
+  await uiState.flush()
   store.stop()
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -129,6 +130,27 @@ it('shows the saved picks, note and open question on a fresh mount', () => {
   )
   expect(card.querySelector('fieldset[data-current] button[data-selected]')?.textContent).toContain(
     'Yes',
+  )
+})
+
+it('shows already answered questions as sent, and opens on one still open', () => {
+  uiState.receive({
+    [CARDS_KEY]: { 'message:5': { drafts: {}, note: '', current: 0, text: '' } },
+  })
+  const card = renderSolid(() => (
+    <MessageQuestions
+      message={{ ...message, answered: { 0: 'Status line' } }}
+      keys={false}
+      withActions={false}
+    />
+  ))
+  expect(card.textContent).toContain('1/2')
+  expect(card.textContent).toContain('Status line')
+  expect(card.textContent).toContain('· sent')
+  expect(card.querySelector('fieldset[data-current] legend')?.textContent).toBe('Land it?')
+  expect(card.querySelector('[aria-label="Send 0 of 1: answer to message 5"]')).toHaveProperty(
+    'disabled',
+    true,
   )
 })
 
@@ -172,7 +194,7 @@ it('announces the current choice and rating, and clears picks without advancing'
   await uiState.flush()
 })
 
-it('opens the next question on Enter when recommended picks answer every question', async () => {
+it('leaves recommendations unchosen on Enter and accepts them with ⇧↵', async () => {
   const recommended: Message = {
     ...message,
     id: 9,
@@ -200,6 +222,14 @@ it('opens the next question on Enter when recommended picks answer every questio
   expect(card.querySelector('[aria-label="Undo: answer to message 9"]')).toBeNull()
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
   await vi.advanceTimersByTimeAsync(3000)
+  expect(harness.actions).toEqual([])
+  expect(card.querySelector('[data-selected]')).toBeNull()
+  expect(card.querySelector('[aria-label="Send 0 of 2: answer to message 9"]')).toHaveProperty(
+    'disabled',
+    true,
+  )
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true }))
+  await vi.advanceTimersByTimeAsync(0)
   expect(harness.actions).toEqual([
     {
       name: 'answer',
