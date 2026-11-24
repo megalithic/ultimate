@@ -27,7 +27,8 @@ import {
 import { deadline, debounce } from '../../lib/timers.ts'
 import { ProjectSwatch, RepoLabel, stemOf } from '../sidebar/ui.solid.tsx'
 import { shownPort, target } from './links.ts'
-import { ListAction, PinAction } from './refs.ts'
+import { ListAction, PinAction, StoppedAction } from './refs.ts'
+import { HubTag, StoppedHeading, StoppedRow } from './stopped.solid.tsx'
 import type { RunningProject } from './refs.ts'
 
 const VISIBLE_PROJECTS_POLL_MS = 4_000
@@ -87,6 +88,12 @@ function ProjectsRail() {
     onError: keepLast,
     every: whileVisible(VISIBLE_PROJECTS_POLL_MS),
   })
+  const stoppedList = useAction(StoppedAction, null, {
+    conversation: ROOT,
+    on: showCount,
+    onError: keepLast,
+    every: whileVisible(VISIBLE_PROJECTS_POLL_MS),
+  })
   const shared = useAction(
     PinAction,
     {},
@@ -123,16 +130,18 @@ function ProjectsRail() {
   onSettled(() => enter.cancel)
 
   const projects = () => list.data() ?? []
+  const stopped = () => stoppedList.data() ?? []
+  const refresh = () => Promise.all([list.refetch(), stoppedList.refetch()])
   const loading = () => !list.data() && !list.error()
   const wide = () => hover() || pinned()
-  const family = createMemo(() => projects().map((project) => project.name))
+  const family = createMemo(() => [...projects(), ...stopped()].map((project) => project.name))
   const questions = createMemo(() =>
     projects().reduce((sum, project) => sum + (project.questions ?? 0), 0),
   )
   const working = createMemo(() => projects().filter((project) => (project.busy ?? 0) > 0).length)
 
   return (
-    <Show when={loading() || projects().length >= 2}>
+    <Show when={loading() || projects().length + stopped().length >= 2}>
       <div
         class={cn('relative shrink-0', pinned() ? 'w-68' : 'w-14')}
         onMouseEnter={enter}
@@ -188,6 +197,19 @@ function ProjectsRail() {
                     last={stemOf(projects()[index() + 1]?.name ?? '') !== stemOf(project().name)}
                     gap={index() > 0}
                     project={project()}
+                    wide={wide()}
+                  />
+                )}
+              </For>
+              <Show when={stopped().length > 0}>
+                <StoppedHeading count={stopped().length} wide={wide()} />
+              </Show>
+              <For each={stopped()} keyed={(project) => project.home}>
+                {(project) => (
+                  <StoppedRow
+                    family={family()}
+                    project={project()}
+                    refresh={refresh}
                     wide={wide()}
                   />
                 )}
@@ -254,6 +276,7 @@ function Row(props: {
   const title = createMemo(() =>
     [
       prettyName(props.project.name),
+      props.project.hub && 'hub',
       props.project.repo?.name,
       shownPort(props.project, location),
       unreachable() && 'not on the tailnet',
@@ -335,13 +358,18 @@ function Row(props: {
       <Show when={props.wide}>
         <span class="flex min-w-0 flex-1 items-center gap-2 pr-2.5 pl-1.5">
           <span class="flex min-w-0 flex-1 flex-col">
-            <span
-              class={cn(
-                'truncate text-[13px] leading-5',
-                here() ? 'font-semibold text-foreground' : 'text-foreground/85',
-              )}
-            >
-              {prettyName(props.project.name)}
+            <span class="flex min-w-0 items-center gap-1.5">
+              <span
+                class={cn(
+                  'truncate text-[13px] leading-5',
+                  here() ? 'font-semibold text-foreground' : 'text-foreground/85',
+                )}
+              >
+                {prettyName(props.project.name)}
+              </span>
+              <Show when={props.project.hub}>
+                <HubTag />
+              </Show>
             </span>
             <span class="flex min-w-0 items-center gap-1.5 font-mono text-[10px] leading-4 text-muted-foreground/80">
               <Show when={!pending()} fallback={<span class="text-brand">opening…</span>}>

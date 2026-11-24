@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import { expectDistinctAgentNames } from '../../../../test/web/agent-names.ts'
 import { FakeSource, fakeSubscriptions } from '../../../../test/web/fake-source.ts'
 import { renderSolid } from '../../../../test/web/solid-dom-setup.ts'
-import type { RunningProject } from '../../refs.ts'
+import type { RunningProject, StoppedProject } from '../../refs.ts'
 import { parseConversationId } from '../../../../lib/ids.ts'
 
 const harness = vi.hoisted(() => ({
@@ -13,6 +13,8 @@ const harness = vi.hoisted(() => ({
   pins: [] as { pinned: boolean; source: string | null }[],
   calls: [] as string[],
   projects: [] as RunningProject[],
+  stopped: [] as StoppedProject[],
+  changes: [] as { action: string; home: string; source: string | null }[],
   slowPinReads: false,
   failPinWrites: false,
   failUnpins: false,
@@ -36,6 +38,18 @@ vi.mock('../../../../web/src/sdk/client.ts', async () => {
     if (!action) return subscriptions.handle(path, init) ?? Response.json({ ok: true })
     harness.calls.push(action)
     if (action === 'list') return Response.json({ result: harness.projects })
+    if (action === 'stopped') return Response.json({ result: harness.stopped })
+    if (action === 'start' || action === 'forget') {
+      const { args } = JSON.parse(init!.body as string) as { args: { home: string } }
+      harness.changes.push({
+        action,
+        home: args.home,
+        source: new Headers(init?.headers).get('x-ultimate-source'),
+      })
+      if (action === 'forget')
+        harness.stopped = harness.stopped.filter((project) => project.home !== args.home)
+      return Response.json({ result: action === 'start' ? { output: 'Starting on :4751' } : {} })
+    }
     const { args } = JSON.parse(init!.body as string) as { args: { pinned?: boolean } }
     if (
       args.pinned !== undefined &&
@@ -118,6 +132,8 @@ beforeEach(async () => {
   harness.pins.length = 0
   harness.calls.length = 0
   harness.pinned = false
+  harness.stopped = []
+  harness.changes.length = 0
   harness.slowPinReads = false
   harness.failPinWrites = false
   harness.failUnpins = false
@@ -228,6 +244,42 @@ async function closeRail(container: HTMLElement) {
   rail(container)!.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
   await advance(10)
 }
+
+it('counts stopped rows, marks the hub, starts with output, and forgets without deleting conversations', async () => {
+  harness.projects = [{ ...harness.projects[0], hub: true }]
+  harness.stopped = [{ name: 'my-app', home: '/state/my-app', root: '/work/my-app', hub: true }]
+  const container = await mount()
+  expect(
+    [...container.querySelectorAll<HTMLElement>('[data-project]')].map(
+      (row) => row.dataset.project,
+    ),
+  ).toEqual(['ultimate', 'my-app'])
+  rail(container)!.dispatchEvent(new MouseEvent('mouseenter'))
+  await advance(150)
+  expect(container.querySelectorAll('[data-project] .uppercase')).toHaveLength(2)
+  expect(container.textContent).toContain('Stopped')
+  await expectDistinctAgentNames(agent)
+  const start = agent.act({ steps: [{ ref: 'Start My App', action: 'press' }] })
+  await advance(100)
+  expect((await start).ok).toBe(true)
+  expect(container.querySelector('[data-project="my-app"]')?.textContent).toContain(
+    'Starting on :4751',
+  )
+  expect(harness.changes).toEqual([{ action: 'start', home: '/state/my-app', source: 'agent' }])
+  const forget = agent.act({
+    steps: [
+      { ref: 'Forget My App until it runs again (keeps its conversations)', action: 'press' },
+    ],
+  })
+  await advance(100)
+  expect((await forget).ok).toBe(true)
+  expect(harness.changes.at(-1)).toEqual({
+    action: 'forget',
+    home: '/state/my-app',
+    source: 'agent',
+  })
+  expect(container.querySelector('nav')).toBeNull()
+})
 
 it('keeps a pin over a shared-pin read that was still answering when it was pressed', async () => {
   harness.slowPinReads = true
