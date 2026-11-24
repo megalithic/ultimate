@@ -1,6 +1,13 @@
 import type { ConversationId } from '@earendil-works/pi-durable'
+import { ChevronRight } from '@lucide/solid'
+import type { JSX } from '@solidjs/web'
 import { createMemo, For, mapArray, Show } from 'solid-js'
 import { Button } from '@/components/ui/button.solid.tsx'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible.solid.tsx'
 import {
   useProvided,
   cn,
@@ -276,8 +283,42 @@ function PhasedFlightRow(props: {
         {(activity) => <ActivityLine activity={activity()} id={props.id} />}
       </Show>
       <EpicLine id={props.id} working={data.working().get(props.id) === 'self'} />
-      <FlightChildren id={props.id} depth={0} />
+      <FlightSubagents id={props.id} />
     </li>
+  )
+}
+
+function FlightSubagents(props: { id: ConversationId }) {
+  const data = useData()
+  const below = (id: ConversationId): number =>
+    (data.subagents().get(id) ?? []).reduce((count, child) => count + 1 + below(child), 0)
+  const count = createMemo(() => below(props.id))
+  return (
+    <Show when={count() > 0}>
+      <Collapsible
+        bind={[
+          () => !data.folded().includes(props.id),
+          (next) => {
+            const id = props.id
+            data.setFolded((previous) => [
+              ...previous.filter((key) => key !== id),
+              ...(next ? [] : [id]),
+            ])
+          },
+        ]}
+      >
+        <CollapsibleTrigger
+          aria-label={`Sub-agents of conversation ${props.id}`}
+          class="group/agents ms-5 flex items-center gap-1 py-1 font-mono text-[10.5px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <ChevronRight class="size-3 transition-transform group-data-open/agents:rotate-90" />
+          Sub-agents · {count()}
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <FlightChildren id={props.id} depth={0} />
+        </CollapsibleContent>
+      </Collapsible>
+    </Show>
   )
 }
 
@@ -383,6 +424,7 @@ function useFlightActivity(branches: () => readonly ConversationId[]) {
 }
 
 export function InFlight(props: {
+  action?: JSX.Element
   ids: readonly ConversationId[]
   onConclude: (id: ConversationId, conclude: boolean) => void
 }) {
@@ -403,7 +445,7 @@ export function InFlight(props: {
     })
   return (
     <Show when={props.ids.length > 0}>
-      <Section count={props.ids.length} id="in-flight" label="In flight">
+      <Section action={props.action} count={props.ids.length} id="in-flight" label="In flight">
         <ul class="flex flex-col gap-0.5">
           <For each={props.ids}>
             {(id) => (

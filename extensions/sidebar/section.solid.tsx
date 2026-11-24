@@ -1,5 +1,6 @@
 import { ChevronRight } from '@lucide/solid'
 import type { JSX } from '@solidjs/web'
+import { Show } from 'solid-js'
 import { Button } from '@/components/ui/button.solid.tsx'
 import {
   Collapsible,
@@ -13,6 +14,7 @@ export function Section(props: {
   id: string
   label: string
   count: number
+  action?: JSX.Element
   children: JSX.Element
 }) {
   const [closed, setClosed] = useSidebarState<string[]>('closedSections', [])
@@ -29,15 +31,18 @@ export function Section(props: {
       class="flex flex-col gap-0.5"
       data-sidebar-section={props.id}
     >
-      <CollapsibleTrigger
-        aria-label={props.label}
-        class="group/section mx-2 flex h-7 items-center gap-1 rounded-md px-1 section-label outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-        data-ui="sidebar-section-header"
-      >
-        <ChevronRight class="size-3 transition-transform group-data-open/section:rotate-90" />
-        {props.label}
-        <span class="text-muted-foreground/60 tabular-nums">{props.count}</span>
-      </CollapsibleTrigger>
+      <div class="mx-2 flex items-center">
+        <CollapsibleTrigger
+          aria-label={props.label}
+          class="group/section flex h-7 flex-1 items-center gap-1 rounded-md px-1 section-label outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          data-ui="sidebar-section-header"
+        >
+          <ChevronRight class="size-3 transition-transform group-data-open/section:rotate-90" />
+          {props.label}
+          <span class="text-muted-foreground/60 tabular-nums">{props.count}</span>
+        </CollapsibleTrigger>
+        <Show when={open()}>{props.action}</Show>
+      </div>
       <CollapsibleContent class="flex flex-col gap-0.5">{props.children}</CollapsibleContent>
     </Collapsible>
   )

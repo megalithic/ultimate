@@ -1,5 +1,5 @@
 import type { ConversationId } from '@earendil-works/pi-durable'
-import { ChevronRight } from '@lucide/solid'
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from '@lucide/solid'
 import type { JSX } from '@solidjs/web'
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from 'solid-js'
 import { Button } from '@/components/ui/button.solid.tsx'
@@ -49,11 +49,13 @@ import { talkToUltimate } from '../subagents/ui.solid.tsx'
 import { PendingAction } from '../workspaces/refs.ts'
 import { Landed, useLandings } from './landed.solid.tsx'
 import { LanderState } from './lander.solid.tsx'
+import { anySubagentsOpen } from './listed.ts'
 import { UnderUltimate } from './points.ts'
 import { Project } from './project.solid.tsx'
 import { InFlight, inFlight, MemoryRow } from './root.solid.tsx'
 import { ChildRow, Row, RowMenu, WaitLines } from './rows.solid.tsx'
 import {
+  setAllSubagents,
   shell,
   SidebarData,
   standingAgent,
@@ -219,6 +221,19 @@ function Tree() {
   const tree = (id: ConversationId, closed = false) => (
     <ConversationTree id={id} closed={closed} onConclude={onConclude} branches={ownBranches} />
   )
+  const anyOpen = createMemo(() =>
+    anySubagentsOpen(
+      data.subagents(),
+      flights(),
+      data
+        .topLevel()
+        .filter((c) => !data.roots().has(c.id) && !flightIds().has(c.id))
+        .map((c) => c.id),
+      data.expanded(),
+      data.folded(),
+    ),
+  )
+  const toggleLabel = () => (anyOpen() ? 'Collapse all sub-agents' : 'Expand all sub-agents')
 
   return (
     <div class="flex flex-1 flex-col pb-2">
@@ -262,7 +277,26 @@ function Tree() {
           </fieldset>
         </Show>
         <Slot name="sidebar.top" variant="inline" />
-        <InFlight ids={flights()} onConclude={onConclude} />
+        <InFlight
+          ids={flights()}
+          onConclude={onConclude}
+          action={
+            <Show when={flights().some((id) => data.subagents().has(id))}>
+              <Button
+                aria-label={toggleLabel()}
+                class="flex size-6 items-center justify-center rounded-md text-muted-foreground/70 outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                onClick={() => setAllSubagents(!anyOpen())}
+                title={toggleLabel()}
+                size={null}
+                variant={null}
+              >
+                <Show when={anyOpen()} fallback={<ChevronsUpDown class="size-3" />}>
+                  <ChevronsDownUp class="size-3" />
+                </Show>
+              </Button>
+            </Show>
+          }
+        />
       </nav>
       <Show when={summary()}>
         {(row) => (

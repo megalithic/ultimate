@@ -113,8 +113,11 @@ A child linked to a plan task leads with the plan's `TaskChip` and shows the tas
 A row switches to its child, highlights selection and keeps the top-level summary visible. History forks are not
 invented delegation edges. Expansion is persisted in `ext.conversations.expanded`; buttons support keyboard access.
 An in-flight branch's sub-agents sit in their own Sub-agents group, open until folded (`ext.conversations.folded`).
-The In flight heading's caret (shown while open) and the ⌘K commands Collapse all sub-agents and Expand all
-sub-agents open or close every Sub-agents group at once, in flight and in the trees.
+The In flight heading's extra caret (shown while the section is open and a flight has sub-agents) and the ⌘K
+commands Collapse all sub-agents and Expand all sub-agents open or close every Sub-agents group at once, in flight
+and in the trees. The caret collapses while any flight group is unfolded or any group reachable from a listed
+non-root, non-flight tree row is expanded. Folded flights, expansion saved inside a flight's subtree, and groups
+under roots or unlisted rows do not make it collapse.
 
 @ultimate starts coordinator branches; there are no manual creation commands or isolation preferences. The sidebar
 header names the project and its path (`#<worktree>` in a branch checkout), the full path on hover; Info's first

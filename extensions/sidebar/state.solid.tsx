@@ -2,6 +2,8 @@ import type { ConversationId } from '@earendil-works/pi-durable'
 import { createContext, createMemo, useContext } from 'solid-js'
 import {
   api,
+  getState,
+  setUiState,
   openPanel,
   ParkedRuns,
   ROOT,
@@ -33,7 +35,7 @@ import {
 import { StandingDoc } from '../subagents/refs.ts'
 import { WorkspacesDoc } from '../workspaces/refs.ts'
 import type { Workspace, WorkspaceIndex } from '../workspaces/types.ts'
-import { topLevelRows } from './listed.ts'
+import { allSubagents, subagentParents, topLevelRows } from './listed.ts'
 import { Unlisted } from './points.ts'
 
 export type SidebarConversation = ConversationSummary & { workspace?: Workspace }
@@ -45,8 +47,16 @@ const emptyWorkspaces: WorkspaceIndex = {
   results: {},
 }
 
-export const useSidebarState = <T extends JsonValue>(key: string, initial: T) =>
-  useUiState<T>(`ext.conversations.${key}`, initial)
+const key = (name: string) => `ext.conversations.${name}`
+
+export const useSidebarState = <T extends JsonValue>(name: string, initial: T) =>
+  useUiState<T>(key(name), initial)
+
+export function setAllSubagents(open: boolean) {
+  const { expanded, folded } = allSubagents(subagentParents(getState().conversations), open)
+  setUiState(key('expanded'), expanded)
+  setUiState(key('folded'), folded)
+}
 
 export const useSurface = () => useStore((state) => state.ui.surface?.id ?? 'agent')
 export const useShownId = () => useStore((state) => state.view?.conversation.id ?? state.requested)
@@ -96,6 +106,7 @@ export function useSidebarData() {
   const [concludedIds] = useSidebarState<number[]>('concluded', [])
   const [seen] = useSidebarState<Record<string, number>>('seen', {})
   const [expanded, setExpanded] = useSidebarState<number[]>('expanded', [])
+  const [folded, setFolded] = useSidebarState<number[]>('folded', [])
   const rootsDoc = useDocOf(() => ROOT, RootsDoc)
   const roots = createMemo(() => new Set(rootsDoc()?.roots))
   const byId = createMemo(
@@ -177,6 +188,7 @@ export function useSidebarData() {
     conversations,
     expanded,
     facts,
+    folded,
     hidden,
     index,
     labelOf,
@@ -189,6 +201,7 @@ export function useSidebarData() {
     row,
     seen,
     setExpanded,
+    setFolded,
     shownId,
     shownTop,
     standingIds,

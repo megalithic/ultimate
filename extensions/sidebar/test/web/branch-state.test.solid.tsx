@@ -3,7 +3,7 @@ import { settle } from '@ui-sdk/core/testing'
 import { createAgent } from '@ui-sdk/solid/agent'
 import { flush } from 'solid-js'
 import { expect, it, vi } from 'vitest'
-import { ROOT } from '@/sdk/solid'
+import { ROOT, runCommand, writingAs } from '@/sdk/solid'
 import { provide } from '@/sdk/types.ts'
 import { parseConversationId, parseEntryId } from '../../../../lib/ids.ts'
 import { SOURCE_HEADER } from '../../../../shared/protocol.ts'
@@ -19,6 +19,7 @@ import { MessagesDoc } from '../../../messages/refs.ts'
 import { RunsDoc, StandingDoc } from '../../../subagents/refs.ts'
 import { PreviewUp } from '../../points.ts'
 import { Conversations } from '../../sidebar.solid.tsx'
+import sidebar from '../../web.solid.tsx'
 
 const harness = vi.hoisted(() => ({
   sources: [] as FakeSource[],
@@ -254,6 +255,57 @@ it('uses the running preview for user waits and idle branches', async ({ onTestF
   await settle()
   flush()
   expect(row.querySelector('[title="waits on you"]')).not.toBeNull()
+})
+
+it('toggles every flight and tree Sub-agents group from the heading and palette commands', async ({
+  onTestFinished,
+}) => {
+  await registry.setLoaders({
+    'extensions/sidebar/web.solid.tsx': async () => ({ default: sidebar }),
+  })
+  const { container, stream } = await mount(onTestFinished)
+  const treeChild = parseConversationId(18)
+  stream.send('conversations', [
+    ...conversations,
+    { id: child, parentConversationId: branch, ownerTaskId: 3 as TaskId, busy: false },
+    { id: treeChild, parentConversationId: earlier, ownerTaskId: 4 as TaskId, busy: false },
+  ])
+  flush()
+  const press = async (ref: string) => {
+    expect(await agent.act({ steps: [{ ref, action: 'press' }] })).toMatchObject({ ok: true })
+    flush()
+  }
+  const group = (id: number) =>
+    container.querySelector(`[aria-label="Sub-agents of conversation ${id}"]`)
+  expect(group(branch)?.getAttribute('aria-expanded')).toBe('true')
+  await press('Collapse all sub-agents')
+  expect(group(branch)?.getAttribute('aria-expanded')).toBe('false')
+  await uiState.flush()
+  expect(harness.writes).toContainEqual({
+    key: 'ext.conversations.folded',
+    value: [branch, earlier],
+    source: 'agent',
+  })
+  writingAs('agent', () => runCommand('sidebar.subagents.expand'))
+  await settle()
+  flush()
+  await press('Earlier')
+  expect(group(branch)?.getAttribute('aria-expanded')).toBe('true')
+  expect(group(earlier)?.getAttribute('aria-expanded')).toBe('true')
+  await press(`Sub-agents of conversation ${branch}`)
+  expect(group(branch)?.getAttribute('aria-expanded')).toBe('false')
+  expect(container.querySelector('[aria-label="Collapse all sub-agents"]')).not.toBeNull()
+  await press('Collapse all sub-agents')
+  expect(group(earlier)?.getAttribute('aria-expanded')).toBe('false')
+  await press('Expand all sub-agents')
+  expect(group(branch)?.getAttribute('aria-expanded')).toBe('true')
+  expect(group(earlier)?.getAttribute('aria-expanded')).toBe('true')
+  writingAs('agent', () => runCommand('sidebar.subagents.collapse'))
+  await settle()
+  flush()
+  expect(group(branch)?.getAttribute('aria-expanded')).toBe('false')
+  expect(group(earlier)?.getAttribute('aria-expanded')).toBe('false')
+  await expectDistinctAgentNames(agent)
 })
 
 it('lets an agent switch, rename, and persist a folded section', async ({ onTestFinished }) => {

@@ -21,7 +21,7 @@ export const subagentParents = (
 ]
 
 export const anySubagentsOpen = (
-  childrenByParent: ReadonlyMap<number, readonly { id: number }[]>,
+  childrenByParent: ReadonlyMap<number, readonly number[]>,
   flights: readonly number[],
   treeTops: readonly number[],
   expanded: readonly number[],
@@ -31,7 +31,7 @@ export const anySubagentsOpen = (
   const visit = (id: number) => {
     if (treeGroups.has(id)) return
     treeGroups.add(id)
-    for (const child of childrenByParent.get(id) ?? []) visit(child.id)
+    for (const child of childrenByParent.get(id) ?? []) visit(child)
   }
   treeTops.forEach(visit)
   return (

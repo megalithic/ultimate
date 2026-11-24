@@ -15,12 +15,12 @@ it('names each conversation with owned children once', () => {
 
 it('counts an in-flight group open unless folded, and only shown tree groups outside flights by expanded', () => {
   const children = new Map([
-    [1, [{ id: 2 }]],
-    [2, [{ id: 4 }]],
-    [7, [{ id: 8 }]],
-    [9, [{ id: 10 }]],
-    [10, [{ id: 11 }]],
-    [82, [{ id: 83 }]],
+    [1, [2]],
+    [2, [4]],
+    [7, [8]],
+    [9, [10]],
+    [10, [11]],
+    [82, [83]],
   ])
   const treeTops = [7]
   expect(anySubagentsOpen(children, [1], treeTops, [1, 2, 7, 9], [])).toBe(true)
