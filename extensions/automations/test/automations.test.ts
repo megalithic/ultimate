@@ -476,6 +476,25 @@ it('removes the prompt on an empty update only while subscribers remain', async 
   ).rejects.toThrow('At least one')
 })
 
+it('pins and unpins through update, keeping the schedule, and lists the flag', async () => {
+  const f = await fixture()
+  const a = (await f.action('create', {
+    name: 'Main',
+    prompt: 'Hello',
+    schedule: 'every 1d',
+  })) as Automation
+  expect(a.pinned).toBeUndefined()
+  const pinned = (await f.action('update', { id: a.id, pinned: true })) as Automation
+  expect(pinned.pinned).toBe(true)
+  expect(pinned.nextAt).toBe(a.nextAt)
+  expect((await f.records())[0].pinned).toBe(true)
+  await f.action('pause', { id: a.id })
+  expect((await f.records())[0]).toMatchObject({ pinned: true, enabled: false })
+  const unpinned = (await f.action('update', { id: a.id, pinned: false })) as Automation
+  expect(unpinned).not.toHaveProperty('pinned')
+  await expect(f.action('update', { id: a.id, pinned: 'yes' })).rejects.toThrow('pinned must be')
+})
+
 it('migrates schedule records saved before scripts and subscribers', async () => {
   const f = await fixture()
   const now = Date.now()

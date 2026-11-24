@@ -45,9 +45,10 @@ async function fixture() {
   const tokens = [...lineageDocs, Messages, Todos, Next]
   const resources = new Map<string, unknown>()
   const invoke = vi.fn<ExtensionHost['invoke']>(async (extension, action, args) => {
-    if (extension !== 'automations' || !['list', 'create', 'describe'].includes(action))
+    const allowed = ['list', 'create', 'describe', 'pause', 'update'] as const
+    if (extension !== 'automations' || !allowed.includes(action as (typeof allowed)[number]))
       throw new Error(`Unexpected action ${extension}/${action}`)
-    const result = await automationActions[action as 'list' | 'create' | 'describe'](args, {
+    const result = await automationActions[action as (typeof allowed)[number]](args, {
       host,
     } as ActionContext)
     return action === 'list'
@@ -84,6 +85,7 @@ async function fixture() {
     notice: () => {},
     want: (api: { name: string }) => (api.name === CloudApi.name ? cloud : undefined),
     need: () => ({
+      dropped: async () => {},
       standing: async () =>
         opened.harness.commit(async (tx) => {
           const standing = await tx.doc(Standing, ROOT_CONVERSATION_ID)
@@ -384,6 +386,35 @@ it('carries subscriber-only schedules as to-dos instead of recreating stale conv
   expect((await f.harness.snapshot(SeedState, ROOT_CONVERSATION_ID, context))!.automations).toEqual(
     [],
   )
+})
+
+it('carries pinned triggers even while paused, keeping them paused, and drops unpinned paused ones', async () => {
+  const f = await fixture()
+  await f.source()
+  const signal = new AbortController().signal
+  const create = (args: JsonValue) =>
+    f.host.invoke('automations', 'create', args, signal) as Promise<Automation>
+  const base = { schedule: 'every 1d', subscribers: ['@ultimate'] }
+  const pinnedPaused = await create({ ...base, name: 'Pinned paused', pinned: true })
+  await automationActions.pause({ id: pinnedPaused.id }, { host: f.host } as ActionContext)
+  await create({ ...base, name: 'Pinned on', pinned: true })
+  const unpinned = await create({ ...base, name: 'Unpinned paused' })
+  await automationActions.pause({ id: unpinned.id }, { host: f.host } as ActionContext)
+  const seed = await buildSeed(f.host, PREPARED)
+  expect(seed.automations.map(({ name, pinned, enabled }) => ({ name, pinned, enabled }))).toEqual([
+    { name: 'Pinned paused', pinned: true, enabled: false },
+    { name: 'Pinned on', pinned: true, enabled: undefined },
+  ])
+  await writeSeed(join(f.home, 'chapters', 'pins'), seed)
+  await f.close()
+  await requestChapter(f.home, 'pins')
+  await f.open()
+  await applySeed(f.host)
+  const carried = await automationActions.list(null, { host: f.host } as ActionContext)
+  expect(carried.map(({ name, pinned, enabled }) => ({ name, pinned, enabled }))).toEqual([
+    { name: 'Pinned paused', pinned: true, enabled: false },
+    { name: 'Pinned on', pinned: true, enabled: true },
+  ])
 })
 
 it('carries event and standing context triggers, but leaves numeric context targets for recreation', async () => {

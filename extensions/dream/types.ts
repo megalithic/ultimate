@@ -21,12 +21,15 @@ export type Seed = {
     agent?: string
     model?: { provider: string; modelId: string }
     thinking?: ModelThinkingLevel
+    pinned?: true
+    enabled?: false
   }[]
   scripts: {
     id: string
     scope?: 'project'
     name: string
     ask: string
+    pinned?: true
     prompt?: string
     agent?: string
     model?: { provider: string; modelId: string }

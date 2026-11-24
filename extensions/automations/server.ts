@@ -353,6 +353,7 @@ function backend(host: ExtensionHost) {
         ]
         Object.assign(sub, runProfile, {
           enabled: true,
+          ...(args.pinned ? { pinned: true } : {}),
           updatedAt: Date.now(),
           subscribers,
           ...(args.key ? { key: args.key } : {}),
@@ -382,6 +383,7 @@ function backend(host: ExtensionHost) {
         ...(args.key ? { key: args.key } : {}),
         name,
         enabled: true,
+        ...(args.pinned ? { pinned: true } : {}),
         script: {
           ask: required(args.ask, 'ask'),
           once: args.once ?? true,
@@ -505,6 +507,8 @@ function backend(host: ExtensionHost) {
     if (args.prompt !== undefined && !removesPromptRun()) required(args.prompt, 'prompt')
     if (args.once !== undefined && typeof args.once !== 'boolean')
       throw new Error('once must be boolean')
+    if (args.pinned !== undefined && typeof args.pinned !== 'boolean')
+      throw new Error('pinned must be boolean')
     if (
       args.secrets !== undefined &&
       (!Array.isArray(args.secrets) || args.secrets.some((s) => typeof s !== 'string'))
@@ -590,6 +594,7 @@ function backend(host: ExtensionHost) {
         name: required(args.name, 'name'),
         ...(args.schedule !== undefined ? { schedule: parseSchedule(args.schedule) } : {}),
         enabled: true,
+        ...(args.pinned ? { pinned: true as const } : {}),
         createdAt: now,
         updatedAt: now,
         runs: [],
@@ -680,6 +685,8 @@ function backend(host: ExtensionHost) {
       }
       if (args.model !== undefined) a.model = args.model
       if (args.thinking !== undefined) a.thinking = args.thinking
+      if (args.pinned) a.pinned = true
+      else if (args.pinned === false) delete a.pinned
       if (a.script && a.script.ask !== preDiscoveryAsk) {
         a.script.state = 'writing'
         delete a.script.error
@@ -912,6 +919,7 @@ export default function automations(host: ExtensionHost) {
             }),
           ),
           once: opt(bool()),
+          pinned: opt(bool()),
           secrets: opt(arr(str())),
           prompt: opt(str()),
           agent: opt(str()),

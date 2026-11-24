@@ -109,7 +109,7 @@ export async function buildSeed(host: ExtensionHost, prepared: Prepared): Promis
         (item) =>
           item.id !== own &&
           item.id !== ownPause &&
-          item.enabled &&
+          (item.enabled || item.pinned) &&
           (item.schedule || item.event || item.condition),
       )
       .map((item) => {
@@ -134,6 +134,8 @@ export async function buildSeed(host: ExtensionHost, prepared: Prepared): Promis
           ...(agent ? { agent } : {}),
           ...(model ? { model } : {}),
           ...(thinking ? { thinking } : {}),
+          ...(item.pinned ? { pinned: true as const } : {}),
+          ...(item.enabled ? {} : { enabled: false as const }),
         }
       })
     const names = new Set<string>()
@@ -142,12 +144,13 @@ export async function buildSeed(host: ExtensionHost, prepared: Prepared): Promis
       names.add(name)
     }
     const watchers = automations
-      .filter((item) => item.enabled && item.script)
-      .map(({ id, scope, name, script, prompt, agent, model, thinking }) => ({
+      .filter((item) => (item.enabled || item.pinned) && item.script)
+      .map(({ id, scope, name, script, prompt, agent, model, thinking, pinned }) => ({
         id,
         ...(scope ? { scope } : {}),
         name,
         ask: script!.ask,
+        ...(pinned ? { pinned } : {}),
         ...(prompt ? { prompt } : {}),
         ...(agent ? { agent } : {}),
         ...(model ? { model } : {}),
@@ -225,15 +228,15 @@ export async function applySeed(host: ExtensionHost) {
         })),
         ...seed.scripts
           .filter((item) => item.scope !== 'project')
-          .map(({ id, name, ask, prompt, agent }) => ({
+          .map(({ id, name, ask, prompt, agent, pinned }) => ({
             owner: 'ultimate' as const,
-            text: `Recreate script ${id} (${name}): ${ask}${prompt ? ` · prompt: ${prompt}${agent ? ` (agent ${agent})` : ''}` : ''}`,
+            text: `Recreate${pinned ? ' and pin' : ''} script ${id} (${name}): ${ask}${prompt ? ` · prompt: ${prompt}${agent ? ` (agent ${agent})` : ''}` : ''}`,
           })),
         ...seed.automations
           .filter((item) => !portableTrigger(item))
-          .map(({ name, schedule, event, condition }) => ({
+          .map(({ name, schedule, event, condition, pinned }) => ({
             owner: 'ultimate' as const,
-            text: `Recreate ${schedule ? 'schedule' : event ? 'event' : 'context'} automation (${name}) with new ${condition?.of.startsWith('#') ? 'conversation target' : 'subscribers'}: ${JSON.stringify(schedule ?? event ?? condition)}`,
+            text: `Recreate${pinned ? ' and pin' : ''} ${schedule ? 'schedule' : event ? 'event' : 'context'} automation (${name}) with new ${condition?.of.startsWith('#') ? 'conversation target' : 'subscribers'}: ${JSON.stringify(schedule ?? event ?? condition)}`,
           })),
       ]
       for (const item of carried) todos.items.push({ ...item, id: todos.next++, at: Date.now() })
@@ -260,17 +263,27 @@ export async function applySeed(host: ExtensionHost) {
     const receipt = await harness.snapshot(SeedState, ROOT_CONVERSATION_ID, context)
     const uniqueNameAlreadyRecreated = receipt?.automations.includes(automation.name)
     if (uniqueNameAlreadyRecreated) continue
-    await host.invoke(
+    const { enabled, ...args } = automation
+    const created = (await host.invoke(
       'automations',
       'create',
-      { ...automation, key: `seed:${host.chapter.name}:${automation.name}` },
+      { ...args, key: `seed:${host.chapter.name}:${automation.name}` },
       signal,
-    )
+    )) as Automation
+    if (enabled === false && created.enabled)
+      await host.invoke('automations', 'pause', { id: created.id }, signal)
     await harness.commit(async (tx) => {
       const saved = await tx.doc(SeedState, ROOT_CONVERSATION_ID)
       if (!saved.automations.includes(automation.name)) saved.automations.push(automation.name)
     }, context)
   }
+  for (const { id, pinned, scope } of seed.scripts)
+    if (pinned && scope === 'project')
+      await host
+        .invoke('automations', 'update', { id, pinned: true }, signal)
+        .catch((error: unknown) =>
+          host.notice(`Could not pin project automation ${id}: ${String(error)}`),
+        )
   harness.resume()
   return seed
 }

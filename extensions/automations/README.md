@@ -55,6 +55,9 @@ override either. Enabled automations add a line each to the prompt, such as `whe
   scope?, slug?, to?, key?}`. `key` makes it idempotent: a key an automation already has returns that automation.
   New ids are `A<n>`; project scripts use slugs.
 - `update {id, …}` may switch between schedule, event and condition; a script stays a script.
+- `pinned: true` (on create or update; `false` unpins) marks one of the user's main automations: the Ultimate.app menu
+  bar lists pinned ones per instance (through `rtm needs --json`) with Pause/Resume and Run now. A chapter switch
+  carries a pinned trigger even while paused, and keeps it paused.
 - `pause` / `resume`; `run` fires now, or relaunches a script; `runs {id}`; `abort {id, runId}`; `log {id, lines?}`
   (default 50, at most 2000); `subscribe` / `unsubscribe {id, to?}` (default the caller); `escalate {id, reason}`;
   `delete` keeps files and conversations.
@@ -105,7 +108,7 @@ States share one word and colour (`parts.tsx` `lookOf`), worst first: failed (re
 working (purple), watching or scheduled (green), paused and done (grey).
 
 - **Automations tab** (right panel, after Activity; palette "Automations…"): every automation, worst first, with its
-  trigger in words, state line, what a fire does, an enable switch, Run now or Restart, Edit and Delete. A script's
+  trigger in words, state line, what a fire does, an enable switch, Run now or Restart, a pin, Edit and Delete. A script's
   "script" opens its watcher beside the script detail (pid, uptime, exit, fires, live output or source). Expanding a
   row lists its runs. The panel follows the shown conversation: a watcher shows its script.
 - **Sidebar** (`sidebar.top`): up to five active automations, hidden when none; **status-line chip**: the active count

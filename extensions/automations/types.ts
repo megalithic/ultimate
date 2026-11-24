@@ -28,6 +28,7 @@ export type Automation = {
   key?: CreateIdempotencyKey
   name: string
   enabled: boolean
+  pinned?: true
   createdAt: number
   updatedAt: number
   schedule?: Schedule
@@ -95,6 +96,7 @@ export type CreateArgs = {
   slug?: string
   to?: string
   key?: string
+  pinned?: boolean
 }
 export type Args = Partial<CreateArgs> & {
   action: string

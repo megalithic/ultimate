@@ -4,6 +4,7 @@ import {
   CircleAlertIcon,
   EllipsisIcon,
   PencilIcon,
+  PinIcon,
   PlayIcon,
   PlusIcon,
   RotateCwIcon,
@@ -75,6 +76,7 @@ import {
   ResumeAction,
   RunAction,
   ScriptAction,
+  UpdateAction,
 } from './refs.ts'
 import { RunLabel, WatcherLabel } from './types.ts'
 import type { Automation, AutomationListItem, Run, Schedule } from './refs.ts'
@@ -333,6 +335,44 @@ function Toggle({
   )
 }
 
+function Pin({
+  automation,
+  act,
+}: {
+  automation: Automation
+  act: (work: () => Promise<unknown>) => Promise<void>
+}) {
+  const [pending, setPending] = useState<boolean>()
+  const pinned = pending ?? !!automation.pinned
+  const toggle = () => {
+    setPending(!pinned)
+    void act(() => api.action(UpdateAction, { id: automation.id, pinned: !pinned })).finally(() =>
+      setPending(undefined),
+    )
+  }
+  return (
+    <Button
+      aria-label={`${pinned ? 'Unpin' : 'Pin'} ${automation.name}`}
+      aria-pressed={pinned}
+      className={cn(
+        'size-6 shrink-0 hover:text-foreground',
+        pinned ? 'text-foreground' : 'text-muted-foreground/60',
+      )}
+      disabled={pending !== undefined}
+      onClick={toggle}
+      size="icon-xs"
+      title={
+        pinned
+          ? 'Pinned: shown in the Ultimate menu bar. Click to unpin'
+          : 'Pin to the Ultimate menu bar'
+      }
+      variant="ghost"
+    >
+      <PinIcon className={cn('size-3', pinned && 'fill-current')} />
+    </Button>
+  )
+}
+
 function AutomationRow({
   automation,
   now,
@@ -480,6 +520,7 @@ function AutomationRow({
             {busy === 'run' ? 'Starting…' : 'Run now'}
           </Button>
         )}
+        <Pin act={act} automation={automation} />
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
