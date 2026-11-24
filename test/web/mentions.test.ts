@@ -151,3 +151,31 @@ it('links a message on another project, optionally on a named machine', () => {
     'message 8@app',
   ])
 })
+
+it('links a mention on a dotted project, which GFM would autolink as an email', async () => {
+  const { Streamdown, defaultRemarkPlugins } = await import('streamdown')
+  const hrefs = (markdown: string) =>
+    [
+      ...renderToStaticMarkup(
+        createElement(Streamdown, {
+          mode: 'static',
+          remarkPlugins: [...Object.values(defaultRemarkPlugins), remarkMentions],
+          components: { a: ({ href }) => createElement('a', { href }) },
+          children: markdown,
+        }),
+      ).matchAll(/href="([^"]*)"/g),
+    ].map((match) => match[1])
+  expect(hrefs('message 567@.dotfiles')).toEqual(['#message-567@.dotfiles'])
+  expect(hrefs('message 7@.dotfiles:laptop')).toEqual(['#message-7@.dotfiles:laptop'])
+  expect(hrefs('message 501@swifties')).toEqual(['#message-501@swifties'])
+  expect(hrefs('card 3@provider_portal')).toEqual(['#message-3@provider_portal'])
+  expect(hrefs('Then see message 5@.dotfiles.')).toEqual(['#message-5@.dotfiles'])
+  expect(hrefs('mail seth@example.com or 567@.dotfiles')).toEqual([
+    'mailto:seth@example.com',
+    'mailto:567@.dotfiles',
+  ])
+  expect(hrefs('message [567@example.com](mailto:567@example.com)')).toEqual([
+    'mailto:567@example.com',
+  ])
+  expect(hrefs('message 5@x.y@z.com')).toEqual(['mailto:5@x.y'])
+})

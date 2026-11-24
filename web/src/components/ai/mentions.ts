@@ -70,13 +70,55 @@ export function splitMentions(text: string) {
   return parts
 }
 
-type Node = { type: string; value?: string; children?: Node[]; url?: string }
+type Node = {
+  type: string
+  value?: string
+  children?: Node[]
+  url?: string
+  position?: { start: { offset?: number }; end: { offset?: number } }
+}
+
+const literalEmailAutolinkText = (node: Node) => {
+  const text = node.type === 'link' && node.children?.length === 1 ? node.children[0] : undefined
+  const value = text?.type === 'text' ? text.value : undefined
+  const span = node.position && (node.position.end.offset ?? 0) - (node.position.start.offset ?? 0)
+  return value && node.url === `mailto:${value}` && span === value.length ? value : undefined
+}
+
+const mentionCovers = (text: string, from: number, to: number) => {
+  let at = 0
+  return splitMentions(text).some((part) => {
+    at += (typeof part === 'string' ? part : part.text).length
+    return typeof part !== 'string' && at - part.text.length <= from && at >= to
+  })
+}
+
+function foldGfmEmailAutolinksIntoMentions(children: Node[]) {
+  const out: Node[] = []
+  for (let i = 0; i < children.length; i++) {
+    const [before, link, after] = [out.at(-1), children[i], children[i + 1]]
+    const email = literalEmailAutolinkText(link)
+    if (before?.type !== 'text' || !before.value || !email) {
+      out.push(link)
+      continue
+    }
+    const rest = after?.type === 'text' ? (after.value ?? '') : ''
+    const text = before.value + email + rest
+    if (!mentionCovers(text, before.value.length, before.value.length + email.length)) {
+      out.push(link)
+      continue
+    }
+    before.value = text
+    if (after?.type === 'text') i++
+  }
+  return out
+}
 
 export function remarkMentions() {
   const visit = (node: Node) => {
     const preservesExistingLink = () => node.type === 'link' || node.type === 'linkReference'
     if (!node.children || preservesExistingLink()) return
-    node.children = node.children.flatMap((child) => {
+    node.children = foldGfmEmailAutolinksIntoMentions(node.children).flatMap((child) => {
       if (child.type !== 'text' || !child.value || !/#|message |card /i.test(child.value)) {
         visit(child)
         return [child]
