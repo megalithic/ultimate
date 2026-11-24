@@ -90,6 +90,15 @@ describe('withdrawQueuedSteer', () => {
     expect(api.cancelSubmission).toHaveBeenCalledWith(3, 7)
     expect(api.cancelSubmission).toHaveBeenCalledTimes(1)
   })
+  it('never takes a delivered steer such as an automation fire or a message', async () => {
+    const api = accepting()
+    const delivered = { ...steer(4), entry: { kind: 'automations.fired' } } as InboxItem
+    await expect(
+      withdrawQueuedSteer(api, 7 as ConversationId, [steer(2), delivered]),
+    ).resolves.toEqual({ text: 'steer 2', images: [] })
+    expect(api.cancelSubmission).toHaveBeenCalledWith(2, 7)
+    expect(api.cancelSubmission).toHaveBeenCalledTimes(1)
+  })
   it('merges nothing without a queued steer', async () => {
     const api = accepting()
     await expect(
@@ -125,6 +134,13 @@ describe('recallQueued', () => {
     ])
     expect(recalled.map((input) => input.text)).toEqual(['steer 2', 'follow-up 1', 'follow-up 3'])
     expect(api.cancelSubmission.mock.calls.map(([id]) => id)).toEqual([2, 1, 3])
+  })
+  it('recalls only typed inputs and leaves deliveries queued', async () => {
+    const api = accepting()
+    const fire = { ...followUp(1), entry: { kind: 'automations.fired' } } as InboxItem
+    const recalled = await recallQueued(api, 7 as ConversationId, [fire, steer(2)])
+    expect(recalled.map((input) => input.text)).toEqual(['steer 2'])
+    expect(api.cancelSubmission.mock.calls.map(([id]) => id)).toEqual([2])
   })
   it('leaves out an input the run took meanwhile', async () => {
     const recalled = await recallQueued(taken([2]), 7 as ConversationId, [steer(2), followUp(3)])

@@ -45,12 +45,14 @@ export const atFirstLine = (value: string, caret: number) => !value.slice(0, car
 const takenByRunBeforeWithdrawal = (failure: unknown) =>
   failure instanceof HttpError && failure.status === 409
 
+const typedNotDelivered = (item: InboxItem) => item.mode !== 'write' && item.entry === undefined
+
 export async function withdrawQueuedSteer(
   api: QueueApi,
   conversationId: ConversationId,
   items: readonly InboxItem[],
 ): Promise<QueuedInput | undefined> {
-  const previous = items.findLast((item) => item.mode === 'steer')
+  const previous = items.findLast((item) => item.mode === 'steer' && typedNotDelivered(item))
   if (!previous) return undefined
   try {
     await api.cancelSubmission(previous.id, conversationId)
@@ -72,8 +74,8 @@ export async function recallQueued(
   items: readonly InboxItem[],
 ): Promise<QueuedInput[]> {
   const steersBeforeFollowUps = [
-    ...items.filter((item) => item.mode === 'steer'),
-    ...items.filter((item) => item.mode === 'followUp'),
+    ...items.filter((item) => item.mode === 'steer' && typedNotDelivered(item)),
+    ...items.filter((item) => item.mode === 'followUp' && typedNotDelivered(item)),
   ]
   const recovered = await Promise.all(
     steersBeforeFollowUps.map(async (item) => {

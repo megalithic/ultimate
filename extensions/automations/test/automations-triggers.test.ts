@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { fauxProvider, fauxAssistantMessage, fauxText } from '@earendil-works/pi-ai/providers/faux'
-import { configure, ROOT_CONVERSATION_ID } from '@earendil-works/pi-durable'
+import { configure, InboxDoc, LiveDoc, ROOT_CONVERSATION_ID } from '@earendil-works/pi-durable'
 import type {
   Conversation,
   ConversationId,
@@ -524,6 +524,49 @@ it('evaluates on create and resume, including a numeric conversation target', as
   }, context)
   await f.action('resume', { id: a.id })
   expect((await f.record(a.id)).fires).toBe(2)
+})
+
+it('delivers the fire of a condition created above its threshold after the busy target’s run', async () => {
+  const f = await fixture()
+  const faux = f.host.faux!
+  let release!: () => void
+  const held = new Promise<void>((resolve) => (release = resolve))
+  const ok = () => {
+    faux.appendResponses([ok])
+    return fauxAssistantMessage([fauxText('OK')])
+  }
+  faux.setResponses([
+    async () => {
+      await held
+      return fauxAssistantMessage([fauxText('busy')])
+    },
+    ok,
+  ])
+  await f.harness.commit(async (tx) => {
+    ;(await tx.doc(Standing, ROOT_CONVERSATION_ID)).ultimate = f.target
+    await configure(tx, f.target, {
+      model: { provider: faux.getModel().provider, modelId: faux.getModel().id },
+    })
+  }, context)
+  const target = (await f.harness.conversation(f.target, context))!
+  const work = await target.submit({ type: 'input', content: 'Work' }, context)
+  await until(async () => (await f.harness.snapshot(LiveDoc, f.target, context))?.run !== undefined)
+  await f.usage(69)
+  const a = (await f.action('create', {
+    name: 'Compact at 30%',
+    condition: { metric: 'context', of: '@ultimate', above: 30 },
+  })) as Automation
+  expect((await f.record(a.id)).fires).toBe(1)
+  await until(async () =>
+    (await f.harness.snapshot(InboxDoc, f.target, context))!.items.some(
+      (item) => item.mode !== 'write' && item.entry?.kind === 'automations.fired',
+    ),
+  )
+  release()
+  expect((await work.wait(context)).status).toBe('done')
+  await until(async () =>
+    (await target.context(context)).entries.some((e) => e.kind === 'automations.fired'),
+  )
 })
 
 const floodTriggers: { kind: string; trigger: Record<string, JsonValue> }[] = [
