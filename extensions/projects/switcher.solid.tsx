@@ -106,11 +106,10 @@ function PhoneSwitcher(props: { machine: string }) {
         aria-label={`Switch project: ${name()} on ${props.machine}${waitingElsewhere() ? `, ${waitingElsewhere()} waiting elsewhere` : ''}`}
         class={cn(
           machineChip,
-          'shrink transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-open:bg-accent',
+          'shrink-0 transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-open:bg-accent',
         )}
         data-ui="project-switcher"
       >
-        <Laptop aria-hidden="true" class="size-3.5 shrink-0 opacity-60" />
         <span class="truncate">{props.machine}</span>
         <Show when={waitingElsewhere() > 0}>
           <Count value={waitingElsewhere()} />
