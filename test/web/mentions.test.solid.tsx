@@ -176,7 +176,7 @@ it('links a mention on a dotted project, which GFM would autolink as an email', 
   expect(hrefs('message 567@.config')).toEqual(['#message-567@.config'])
   expect(hrefs('message 7@.config:laptop')).toEqual(['#message-7@.config:laptop'])
   expect(hrefs('message 501@my-app')).toEqual(['#message-501@my-app'])
-  expect(hrefs('card 3@provider_portal')).toEqual(['#message-3@provider_portal'])
+  expect(hrefs('card 3@other_app')).toEqual(['#message-3@other_app'])
   expect(hrefs('Then see message 5@.config.')).toEqual(['#message-5@.config'])
   expect(hrefs('mail user@example.com or 567@.config')).toEqual([
     'mailto:user@example.com',
