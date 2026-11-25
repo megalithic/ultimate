@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Play } from '@lucide/solid'
+import { Check, ChevronDown, Laptop, Play } from '@lucide/solid'
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import type { JSX } from '@solidjs/web'
 import {
@@ -10,7 +10,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.solid.tsx'
 import {
-  ProjectChip,
   ROOT,
   api,
   cn,
@@ -32,16 +31,33 @@ import type { RemoteProject, RunningProject, StoppedProject } from './refs.ts'
 const VISIBLE_POLL_MS = 4_000
 const REMOTE_POLL_MS = 15_000
 
-export function TitlebarProject() {
+const machineChip =
+  'flex h-7 min-w-0 items-center gap-1.5 rounded-md px-2 font-mono text-[11.5px] text-muted-foreground'
+
+export function TitlebarMachine() {
   const viewport = useViewport()
+  const system = useSystem()
+  const machine = () => system()?.machine.hostname.split('.')[0]
   return (
-    <Show when={viewport() === 'phone'} fallback={<ProjectChip />}>
-      <PhoneSwitcher />
+    <Show when={machine()}>
+      {(name) => (
+        <Show
+          when={viewport() === 'phone'}
+          fallback={
+            <span class={machineChip} title={`This Ultimate runs on ${name()}`}>
+              <Laptop aria-hidden="true" class="size-3.5 shrink-0 opacity-60" />
+              <span class="truncate">{name()}</span>
+            </span>
+          }
+        >
+          <PhoneSwitcher machine={name()} />
+        </Show>
+      )}
     </Show>
   )
 }
 
-function PhoneSwitcher() {
+function PhoneSwitcher(props: { machine: string }) {
   const system = useSystem()
   const visible = usePageVisible()
   const [openings, setOpenings] = createSignal(0)
@@ -87,11 +103,15 @@ function PhoneSwitcher() {
       onOpenChange={(open) => open && setOpenings((count) => count + 1)}
     >
       <DropdownMenuTrigger
-        aria-label={`Switch project: ${name()}${waitingElsewhere() ? `, ${waitingElsewhere()} waiting elsewhere` : ''}`}
-        class="flex h-7 min-w-0 shrink items-center gap-1.5 rounded-md px-2 font-sans text-[13px] font-medium text-foreground/90 transition-colors outline-none hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring data-open:bg-accent"
+        aria-label={`Switch project: ${name()} on ${props.machine}${waitingElsewhere() ? `, ${waitingElsewhere()} waiting elsewhere` : ''}`}
+        class={cn(
+          machineChip,
+          'shrink transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring data-open:bg-accent',
+        )}
         data-ui="project-switcher"
       >
-        <span class="truncate">{name()}</span>
+        <Laptop aria-hidden="true" class="size-3.5 shrink-0 opacity-60" />
+        <span class="truncate">{props.machine}</span>
         <Show when={waitingElsewhere() > 0}>
           <Count value={waitingElsewhere()} />
         </Show>

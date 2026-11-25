@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import { expectDistinctAgentNames } from '../../../../test/web/agent-names.ts'
 import { FakeSource, fakeSubscriptions } from '../../../../test/web/fake-source.ts'
 import { renderSolid } from '../../../../test/web/solid-dom-setup.ts'
+import type { SystemInfo } from '../../../../shared/protocol.ts'
 import type { RemoteProject, RunningProject, StoppedProject } from '../../refs.ts'
 import { parseConversationId } from '../../../../lib/ids.ts'
 
@@ -124,7 +125,7 @@ function setVisibility(state: DocumentVisibilityState) {
 
 import { registry, store } from '../../../../web/src/sdk/client.ts'
 import { OpeningBar, Rail } from '../../rail.solid.tsx'
-import { TitlebarProject } from '../../switcher.solid.tsx'
+import { TitlebarMachine } from '../../switcher.solid.tsx'
 
 const agent = createAgent()
 beforeAll(() => vi.useFakeTimers())
@@ -440,7 +441,7 @@ it('gives way to another extension’s rail and to a phone', async () => {
   await registry.setLoaders({})
 })
 
-it('switches projects from the title bar on a phone: this Mac, other machines and Start, and leaves the chip alone elsewhere', async () => {
+it('switches projects from the title bar on a phone: this Mac, other machines and Start, and shows only the machine elsewhere', async () => {
   resize(false)
   harness.projects[2] = { ...harness.projects[2], busy: 1 }
   harness.remotes = [
@@ -448,12 +449,16 @@ it('switches projects from the title bar on a phone: this Mac, other machines an
     { machine: 'studio', name: 'quiet', url: 'https://studio.example:4750' },
   ]
   harness.stopped = [{ name: 'old-app', home: '/state/old-app', root: '/work/old-app' }]
-  const container = renderSolid(() => <TitlebarProject />)
+  harness.sources[0].send('system', {
+    machine: { hostname: 'studio.local', home: '/home/test' },
+    project: { root: '/work/ultimate', name: 'ultimate' },
+  } as unknown as SystemInfo)
+  const container = renderSolid(() => <TitlebarMachine />)
   await advance(100)
   const trigger = agent
     .snapshot()
     .find((entry) => !entry.offPage && entry.label?.startsWith('Switch project'))!
-  expect(trigger.label).toBe('Switch project: Ultimate, 3 waiting elsewhere')
+  expect(trigger.label).toBe('Switch project: Ultimate on studio, 3 waiting elsewhere')
   const opened = agent.act({ steps: [{ ref: trigger.ref, action: 'setOpen', args: [true] }] })
   await advance(100)
   expect(await opened).toMatchObject({ ok: true })
@@ -474,6 +479,7 @@ it('switches projects from the title bar on a phone: this Mac, other machines an
   resize(true)
   flush()
   expect(container.querySelector('[data-ui="project-switcher"]')).toBeNull()
+  expect(container.textContent).toBe('studio')
 })
 
 it('shows the opening bar after a click until the page is left, shown again, or 15 s pass', async ({
