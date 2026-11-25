@@ -3,7 +3,8 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { actions, list, stopped } from '../server.ts'
+import { hostname } from 'node:os'
+import { actions, list, remotes, stopped } from '../server.ts'
 import type { ExtensionHost } from '../../../server/extensions.ts'
 import { temp } from '../../../test/helpers.ts'
 
@@ -122,4 +123,34 @@ it('names the Tailscale port of each project the registry knows, for pages opene
     ['other', undefined],
     ['unpublished', undefined],
   ])
+})
+
+it('lists the hubs remotes names on other machines with their counts, without this machine and without counts from one that does not answer', async () => {
+  const other = createServer((request, response) => {
+    response.setHeader('Content-Type', 'application/json')
+    response.end(JSON.stringify({ result: { busy: 1, questions: { count: 4 } } }))
+  })
+  await new Promise<void>((done) => other.listen(0, '127.0.0.1', done))
+  const url = `http://127.0.0.1:${(other.address() as AddressInfo).port}`
+  const userHome = await temp('ultimate-projects-')
+  await mkdir(join(userHome, '.ultimate'))
+  await writeFile(
+    join(userHome, '.ultimate/settings.json'),
+    JSON.stringify({
+      remotes: {
+        [hostname().split('.')[0].toUpperCase()]: { hub: 'http://127.0.0.1:9' },
+        studio: { hub: `${url}/`, app: 'http://127.0.0.1:1' },
+        laptop: { hub: 'file:///etc/passwd' },
+      },
+    }),
+  )
+  const host = { userHome, notice: () => {} } as unknown as ExtensionHost
+  try {
+    expect(await remotes(host, new AbortController().signal)).toEqual([
+      { machine: 'studio', name: 'hub', url, busy: 1, questions: 4 },
+      { machine: 'studio', name: 'app', url: 'http://127.0.0.1:1' },
+    ])
+  } finally {
+    other.close()
+  }
 })

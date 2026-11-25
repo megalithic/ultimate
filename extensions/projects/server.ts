@@ -7,14 +7,21 @@ import { rebuiltOnOpen, meansNone } from '../../lib/errors.ts'
 import { readJson, updateJson } from '../../lib/json-file.ts'
 import { githubRepo, readGithubRepo } from '../../lib/project-identity.ts'
 import type { GithubRepo } from '../../lib/project-identity.ts'
-import { postAction } from '../../lib/remote.ts'
+import { machineName, postAction, userConfiguredRemotes } from '../../lib/remote.ts'
 import { readSettings, userSettingsPath } from '../../lib/settings.ts'
 import { spawn } from '../../lib/spawn.ts'
 import type { ExtensionHost } from '../../server/extensions.ts'
 import type { ProjectInfo } from '../../server/project.ts'
 import { MessagesApi } from '../messages/api.ts'
-import { ForgetAction, ListAction, PinAction, StartAction, StoppedAction } from './refs.ts'
-import type { RunningProject, StoppedProject } from './refs.ts'
+import {
+  ForgetAction,
+  ListAction,
+  PinAction,
+  RemotesAction,
+  StartAction,
+  StoppedAction,
+} from './refs.ts'
+import type { RemoteProject, RunningProject, StoppedProject } from './refs.ts'
 
 const REMOTE_COUNTS_TIMEOUT_MS = 1_500
 
@@ -112,6 +119,26 @@ export async function list(host: ExtensionHost, signal: AbortSignal): Promise<Ru
   )
 }
 
+const shortMachine = (name: string) => name.split('.')[0].toLowerCase()
+
+export async function remotes(host: ExtensionHost, signal: AbortSignal): Promise<RemoteProject[]> {
+  const here = shortMachine(await machineName(host))
+  const entries = (await userConfiguredRemotes(host)).filter(
+    (entry) => shortMachine(entry.machine) !== here && /^https?:\/\//.test(entry.url),
+  )
+  return Promise.all(
+    entries.map(async ({ machine, name, url }) => {
+      const base = url.replace(/\/+$/, '')
+      return {
+        machine,
+        name,
+        url: base,
+        ...(await timedRemoteCounts(`${name} on ${machine}`, base, signal)),
+      }
+    }),
+  )
+}
+
 const forgottenPath = (host: ExtensionHost) =>
   join(host.userHome, '.ultimate', 'projects-forgotten.json')
 const readForgotten = async (path: string) => {
@@ -202,10 +229,11 @@ export default function projects(host: ExtensionHost) {
   return defineExtension({ name: 'projects' })
 }
 
-export const pollActions = ['list', 'pin', 'stopped']
+export const pollActions = ['list', 'pin', 'remotes', 'stopped']
 
 export const actions = {
   list: implementAction(ListAction, (_args, { host, signal }) => list(host, signal)),
+  remotes: implementAction(RemotesAction, (_args, { host, signal }) => remotes(host, signal)),
   stopped: implementAction(StoppedAction, (_args, { host }) => stopped(host)),
   forget: implementAction(ForgetAction, async (args, { host }) => {
     const { home } = await stoppedProject(host, args)

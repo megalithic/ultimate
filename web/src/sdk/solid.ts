@@ -213,6 +213,8 @@ export { useAllProvided } from './contribution.solid.tsx'
 export { useProvided } from './contribution.solid.tsx'
 /** Building blocks of surfaces; see docs/extensions/surfaces.md. */
 export { Header } from '../app/header.solid.tsx'
+/** The title bar's project name, as it shows when no extension fills `titlebar.project`. */
+export { ProjectChip } from '../app/titlebar.solid.tsx'
 export { Conversation, Dock, Panels, Sidebar, StatusLine } from '../app/shell.solid.tsx'
 /** The prompt box of the scoped or shown conversation alone, without its transcript; wrap it in `ComposerRedirect` to send elsewhere. */
 export { Composer } from '../app/composer.solid.tsx'

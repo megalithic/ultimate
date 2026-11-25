@@ -58,7 +58,7 @@ export function resolveProject(
   )
 }
 
-async function userConfiguredRemotes(host: Pick<ExtensionHost, 'userHome'>) {
+export async function userConfiguredRemotes(host: Pick<ExtensionHost, 'userHome'>) {
   const reportedInvalidSettingsMeanUnset = () => ({})
   const settings = await readSettings(userSettingsPath(host.userHome)).catch(
     reportedInvalidSettingsMeanUnset,
@@ -75,7 +75,7 @@ async function userConfiguredRemotes(host: Pick<ExtensionHost, 'userHome'>) {
   )
 }
 
-async function machineName(host: Pick<ExtensionHost, 'userHome' | 'notice'>) {
+export async function machineName(host: Pick<ExtensionHost, 'userHome' | 'notice'>) {
   return (await cloudConfig(host))?.machine ?? hostname()
 }
 

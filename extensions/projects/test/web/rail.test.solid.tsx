@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vite
 import { expectDistinctAgentNames } from '../../../../test/web/agent-names.ts'
 import { FakeSource, fakeSubscriptions } from '../../../../test/web/fake-source.ts'
 import { renderSolid } from '../../../../test/web/solid-dom-setup.ts'
-import type { RunningProject, StoppedProject } from '../../refs.ts'
+import type { RemoteProject, RunningProject, StoppedProject } from '../../refs.ts'
 import { parseConversationId } from '../../../../lib/ids.ts'
 
 const harness = vi.hoisted(() => ({
@@ -14,6 +14,7 @@ const harness = vi.hoisted(() => ({
   calls: [] as string[],
   projects: [] as RunningProject[],
   stopped: [] as StoppedProject[],
+  remotes: [] as RemoteProject[],
   changes: [] as { action: string; home: string; source: string | null }[],
   slowPinReads: false,
   failPinWrites: false,
@@ -39,6 +40,7 @@ vi.mock('../../../../web/src/sdk/client.ts', async () => {
     harness.calls.push(action)
     if (action === 'list') return Response.json({ result: harness.projects })
     if (action === 'stopped') return Response.json({ result: harness.stopped })
+    if (action === 'remotes') return Response.json({ result: harness.remotes })
     if (action === 'start' || action === 'forget') {
       const { args } = JSON.parse(init!.body as string) as { args: { home: string } }
       harness.changes.push({
@@ -122,6 +124,7 @@ function setVisibility(state: DocumentVisibilityState) {
 
 import { registry, store } from '../../../../web/src/sdk/client.ts'
 import { OpeningBar, Rail } from '../../rail.solid.tsx'
+import { TitlebarProject } from '../../switcher.solid.tsx'
 
 const agent = createAgent()
 beforeAll(() => vi.useFakeTimers())
@@ -133,6 +136,7 @@ beforeEach(async () => {
   harness.calls.length = 0
   harness.pinned = false
   harness.stopped = []
+  harness.remotes = []
   harness.changes.length = 0
   harness.slowPinReads = false
   harness.failPinWrites = false
@@ -434,6 +438,42 @@ it('gives way to another extension’s rail and to a phone', async () => {
   await advance(60_000)
   expect(calls('list') + calls('pin')).toBe(beside)
   await registry.setLoaders({})
+})
+
+it('switches projects from the title bar on a phone: this Mac, other machines and Start, and leaves the chip alone elsewhere', async () => {
+  resize(false)
+  harness.projects[2] = { ...harness.projects[2], busy: 1 }
+  harness.remotes = [
+    { machine: 'studio', name: 'hub', url: 'https://studio.example:4749', questions: 1 },
+    { machine: 'studio', name: 'quiet', url: 'https://studio.example:4750' },
+  ]
+  harness.stopped = [{ name: 'old-app', home: '/state/old-app', root: '/work/old-app' }]
+  const container = renderSolid(() => <TitlebarProject />)
+  await advance(100)
+  const trigger = agent
+    .snapshot()
+    .find((entry) => !entry.offPage && entry.label?.startsWith('Switch project'))!
+  expect(trigger.label).toBe('Switch project: Ultimate, 3 waiting elsewhere')
+  const opened = agent.act({ steps: [{ ref: trigger.ref, action: 'setOpen', args: [true] }] })
+  await advance(100)
+  expect(await opened).toMatchObject({ ok: true })
+  await expectDistinctAgentNames(agent)
+  const items = [...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
+  expect(items.map((item) => [item.ariaLabel, item.getAttribute('href')])).toEqual([
+    ['Open Ultimate · this page · working', null],
+    ['Open Ultimate Eval · 2 for you', 'http://127.0.0.1:4748/'],
+    ['Open My App · working', 'http://127.0.0.1:4750/'],
+    ['Open Hub on studio · 1 for you', 'https://studio.example:4749/'],
+    ['Open Quiet on studio · not answering', 'https://studio.example:4750/'],
+    ['Start Old App', null],
+  ])
+  items.at(-1)!.click()
+  await advance(100)
+  expect(harness.changes).toEqual([{ action: 'start', home: '/state/old-app', source: 'person' }])
+
+  resize(true)
+  flush()
+  expect(container.querySelector('[data-ui="project-switcher"]')).toBeNull()
 })
 
 it('shows the opening bar after a click until the page is left, shown again, or 15 s pass', async ({

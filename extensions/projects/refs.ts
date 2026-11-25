@@ -34,8 +34,21 @@ export type StoppedProject = {
   hub?: true
 }
 
+/** An instance on another machine, named in `remotes` in user settings, with its live state when it answered. */
+export type RemoteProject = {
+  machine: string
+  name: string
+  /** Its address from `remotes`, an `http(s):` URL without a trailing slash. */
+  url: string
+  busy?: number
+  questions?: number
+}
+
 /** No arguments → every running instance on this machine, this one included, in project order. */
 export const ListAction = actionRef<null, RunningProject[]>('projects', 'list')
+
+/** No arguments → the instances `remotes` names on other machines, in settings order; this machine's own entries are left out. */
+export const RemotesAction = actionRef<null, RemoteProject[]>('projects', 'remotes')
 
 /** No arguments → every stopped project not forgotten since it last opened, most recently active first. */
 export const StoppedAction = actionRef<null, StoppedProject[]>('projects', 'stopped')
