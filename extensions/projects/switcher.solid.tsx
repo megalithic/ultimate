@@ -44,9 +44,9 @@ export function TitlebarProject() {
 function PhoneSwitcher() {
   const system = useSystem()
   const visible = usePageVisible()
-  const [open, setOpen] = createSignal(false)
+  const [openings, setOpenings] = createSignal(0)
   const poll = (ms: number) => () => (visible() ? ms : undefined)
-  const options = { conversation: ROOT, onError: keepLast, on: open }
+  const options = { conversation: ROOT, onError: keepLast, on: openings }
   const list = useAction(ListAction, null, { ...options, every: poll(VISIBLE_POLL_MS) })
   const stoppedList = useAction(StoppedAction, null, { ...options, every: poll(VISIBLE_POLL_MS) })
   const remoteList = useAction(RemotesAction, null, { ...options, every: poll(REMOTE_POLL_MS) })
@@ -81,7 +81,11 @@ function PhoneSwitcher() {
     return project ? start(project) : undefined
   }
   return (
-    <DropdownMenu modal={false} onAction={choose} onOpenChange={setOpen}>
+    <DropdownMenu
+      modal={false}
+      onAction={choose}
+      onOpenChange={(open) => open && setOpenings((count) => count + 1)}
+    >
       <DropdownMenuTrigger
         aria-label={`Switch project: ${name()}${waitingElsewhere() ? `, ${waitingElsewhere()} waiting elsewhere` : ''}`}
         class="flex h-7 min-w-0 shrink items-center gap-1.5 rounded-md px-2 font-sans text-[13px] font-medium text-foreground/90 transition-colors outline-none hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring data-open:bg-accent"
