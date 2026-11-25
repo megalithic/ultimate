@@ -76,6 +76,7 @@ import { InReadFile, reachedLine, useLineTarget, usePath } from './link.solid.ts
 import { pickerDialog } from './picker.solid.tsx'
 import { ReadAction, ThreadAction, ThreadsDoc } from './refs.ts'
 import type { ReadFile, Thread } from './refs.ts'
+import { registerCommentSelection } from './shortcuts.ts'
 
 type SendOutcome = { conversation: ConversationId; cleared: boolean } | { error: string }
 type Sent = { file: string; outcome: SendOutcome }
@@ -153,7 +154,7 @@ function Frame(props: {
       <div class="flex min-h-0 flex-1">
         <div class="flex min-w-0 flex-1 flex-col">
           <div class="min-h-0 flex-1 overflow-y-auto" data-reader-scroll="">
-            <div class="mx-auto w-full max-w-[46rem] px-5 pt-8 pb-24 sm:px-10">{props.body}</div>
+            <div class="mx-auto w-full max-w-[72rem] px-5 pt-8 pb-24 sm:px-10">{props.body}</div>
           </div>
           {props.footer}
         </div>
@@ -451,13 +452,18 @@ function pickOf(root: HTMLElement | undefined): Pick | undefined {
     [...range.getClientRects()].find((rect) => rect.width > 0) ?? range.getBoundingClientRect()
   const box = root.getBoundingClientRect()
   const scroller = root.closest('[data-reader-scroll]')?.getBoundingClientRect()
-  const roomInMargin = scroller !== undefined && scroller.right - box.right >= 120
+  const right = Math.max(
+    ...blocks.map(
+      (block) => block.querySelector('[data-reader-box]')!.getBoundingClientRect().right,
+    ),
+  )
+  const roomInMargin = scroller !== undefined && scroller.right - right >= 120
   return {
     first: Number(first.dataset.readerBlock),
     last: Number(last.dataset.readerBlock),
     text,
     around: selectionAround(range, first, last),
-    ...(roomInMargin && { top: firstLine.top - box.top, left: box.width + 16 }),
+    ...(roomInMargin && { top: firstLine.top - box.top, left: right - box.left + 16 }),
   }
 }
 
@@ -548,7 +554,8 @@ function Document(props: {
   })
 
   const comment = () => {
-    const chosen = pick()
+    if (writing()) return
+    const chosen = pickOf(article)
     const first = chosen && blocks()[chosen.first]
     const last = chosen && blocks()[chosen.last]
     if (!chosen || !first || !last) return
@@ -562,6 +569,13 @@ function Document(props: {
     getSelection()?.removeAllRanges()
     setPick(undefined)
   }
+
+  onSettled(() =>
+    registerCommentSelection({
+      available: () => !writing() && !!pickOf(article),
+      run: comment,
+    }),
+  )
 
   const submit = (body: string) => {
     const current = writing()
@@ -690,7 +704,10 @@ function ReaderBlock(props: { block: Block; index: number; marked?: boolean; aft
       data-reader-block={props.index}
       data-start={props.block.start}
     >
-      <div class="group/block relative -mx-3 rounded-md px-3" data-reader-box="">
+      <div
+        class={cn('group/block relative mx-auto rounded-md', !props.block.wide && 'max-w-[41rem]')}
+        data-reader-box=""
+      >
         <span
           aria-hidden="true"
           class="pointer-events-none absolute top-0 right-full mr-2 font-mono text-[10.5px] leading-[1.6] text-muted-foreground/0 tabular-nums transition-colors select-none group-hover/block:text-muted-foreground/50 max-md:hidden"
@@ -701,7 +718,7 @@ function ReaderBlock(props: { block: Block; index: number; marked?: boolean; aft
           <span
             aria-hidden="true"
             class={cn(
-              'absolute inset-y-0.5 left-0 w-0.5 rounded-full',
+              'absolute inset-y-0.5 -left-3 w-0.5 rounded-full',
               props.marked ? 'bg-brand' : 'bg-brand/45',
             )}
           />
@@ -712,7 +729,7 @@ function ReaderBlock(props: { block: Block; index: number; marked?: boolean; aft
           </Show>
         </div>
       </div>
-      {props.after}
+      <div class="mx-auto max-w-[41rem]">{props.after}</div>
     </div>
   )
 }

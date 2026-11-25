@@ -61,6 +61,23 @@ it('splits a file into the blocks chat renders, each with its source lines and f
   expect(blocksOf('---\n\nAfter a rule\n', whole)[0]?.frontMatter).toBeUndefined()
 })
 
+it('widens fenced visuals, tables and image-only paragraphs, but not prose', () => {
+  const source = [
+    'A readable paragraph with ![an inline image](image.png).',
+    '```mermaid\ngraph LR\nA --> B\n```',
+    '~~~ts\nconst value = 1\n~~~',
+    '| First | Second |\n| --- | --- |\n| One | Two |',
+    '![A diagram](image.png)',
+  ].join('\n\n')
+  expect(blocksOf(source, split).map((block) => !!block.wide)).toEqual([
+    false,
+    true,
+    true,
+    true,
+    true,
+  ])
+})
+
 it('keeps an indented code block indented, on its own lines', () => {
   const source = '\n\n    indented code\n      more\n\n  \nafter\n'
   expect(blocksOf(source, split).map(({ source: text, start, end }) => [text, start, end])).toEqual(

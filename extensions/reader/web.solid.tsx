@@ -1,9 +1,10 @@
 import { FileTextIcon } from '@lucide/solid'
-import { defineWebExtension } from '@/sdk/solid'
+import { defineWebExtension, isMac } from '@/sdk/solid'
 import { ReaderCard } from './card.solid.tsx'
 import { PathCode, PathLink, ReaderLink } from './link.solid.tsx'
 import { Picker, pickerDialog } from './picker.solid.tsx'
 import ReaderSurface from './surface.solid.tsx'
+import { commentCommands } from './shortcuts.ts'
 
 export default defineWebExtension({
   surfaces: [
@@ -17,6 +18,7 @@ export default defineWebExtension({
     },
   ],
   commands: [
+    ...commentCommands(isMac),
     {
       id: 'reader.open',
       title: 'Read markdown file…',

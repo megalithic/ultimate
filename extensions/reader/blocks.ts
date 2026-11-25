@@ -8,6 +8,7 @@ export type Block = {
   start: number
   end: number
   frontMatter?: true
+  wide?: true
 }
 
 const newlines = (text: string) => text.split('\n').length - 1
@@ -42,7 +43,12 @@ export function blocksOf(source: string, split: (markdown: string) => string[]):
     const first = line + newlines(blankLinesBefore)
     line += newlines(part)
     if (!body) continue
-    blocks.push({ source: body, start: first, end: first + newlines(body) })
+    blocks.push({
+      source: body,
+      start: first,
+      end: first + newlines(body),
+      ...(wideBlock(body) && { wide: true }),
+    })
   }
   return blocks
 }
@@ -202,6 +208,24 @@ export function hrefTarget(href: string): Target | undefined {
 }
 
 const markdownTree = unified().use(remarkParse).use(remarkGfm)
+
+function wideBlock(source: string) {
+  const nodes = markdownTree.parse(source).children
+  if (nodes.length !== 1) return false
+  const node = nodes[0]
+  return (
+    node.type === 'table' ||
+    (node.type === 'code' && /^ {0,3}(?:`{3,}|~{3,})/.test(source)) ||
+    (node.type === 'paragraph' &&
+      node.children.some((child) => child.type === 'image' || child.type === 'imageReference') &&
+      node.children.every(
+        (child) =>
+          child.type === 'image' ||
+          child.type === 'imageReference' ||
+          (child.type === 'text' && !child.value.trim()),
+      ))
+  )
+}
 
 const relativeHref = (url: string) =>
   url !== '' && isLocalHref(url) && !url.startsWith('/') && !url.startsWith('#')

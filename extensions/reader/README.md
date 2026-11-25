@@ -28,7 +28,11 @@ The **Read** surface shows the file in a reading column, split into the blocks c
 rendered by chat's `Markdown`, with a conversation docked on the right (on a phone, the header's `#id` button switches
 to it): the file's thread once it has one, else the shown conversation. YAML front matter shows as a small muted
 block. The file is read again whenever the docked conversation's transcript changes and when the window regains
-focus, so the agent's edits show while you read.
+focus, so the agent's edits show while you read. Prose and comment cards keep a narrow reading measure; fenced code
+(including diagrams), tables and image-only paragraphs expand into the centred, padded content area up to 72rem.
+
+With text selected in the reading pane, press `c` or, on macOS, ⌃A to comment on it. These shortcuts do nothing
+while typing or while a comment is being written; ⌘A keeps its normal select-all behaviour.
 
 ## A thread per file
 
