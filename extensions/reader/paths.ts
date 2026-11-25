@@ -8,6 +8,10 @@ export const MAX_BYTES = 2 * 1024 * 1024
 const MAX_PATH = 1024
 export const MARKDOWN = /\.(md|markdown)$/i
 
+export const markdownPaths = (nulSeparated: string) => [
+  ...new Set(nulSeparated.split('\0').filter((path) => MARKDOWN.test(path))),
+]
+
 export type Resolved = {
   path: string
   absolute: string

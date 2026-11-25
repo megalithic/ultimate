@@ -9,7 +9,13 @@ import { parseConversationId } from '../../lib/ids.ts'
 import type { ExtensionHost } from '../../server/extensions.ts'
 import { LineageApi } from '../lineage/api.ts'
 import { WorkspacesApi } from '../workspaces/api.ts'
-import { checkoutRoots, gitCommonDir, MARKDOWN, readResolved, resolveMarkdown } from './paths.ts'
+import {
+  checkoutRoots,
+  gitCommonDir,
+  markdownPaths,
+  readResolved,
+  resolveMarkdown,
+} from './paths.ts'
 import { FilesAction, ReadAction, ThreadAction, ThreadsDoc } from './refs.ts'
 import type { Thread } from './refs.ts'
 import { threadFor } from './threads.ts'
@@ -83,10 +89,10 @@ export const actions = {
     const [cwd] = (await rootsOf(ctx.host, conversationOf(args))) as [string]
     const { stdout } = await ctx.exec(
       'git',
-      ['ls-files', '-co', '--exclude-standard', '--', '*.md', '*.markdown'],
+      ['ls-files', '-z', '-co', '--exclude-standard', '--', '*.md', '*.markdown'],
       { cwd },
     )
-    const paths = [...new Set(stdout.split('\n').filter((path) => MARKDOWN.test(path)))]
+    const paths = markdownPaths(stdout)
     const files = await Promise.all(
       paths.map(async (path) => ({
         path,

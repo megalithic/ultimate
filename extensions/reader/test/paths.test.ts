@@ -3,7 +3,14 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { git } from '../../../lib/git.ts'
 import { temp } from '../../../test/helpers.ts'
-import { checkoutRoots, gitCommonDir, MAX_BYTES, readResolved, resolveMarkdown } from '../paths.ts'
+import {
+  checkoutRoots,
+  gitCommonDir,
+  MAX_BYTES,
+  markdownPaths,
+  readResolved,
+  resolveMarkdown,
+} from '../paths.ts'
 
 async function fixture() {
   const base = await realpath(await temp('reader-'))
@@ -56,6 +63,14 @@ it('refuses a file that grew past 2 MB after it was checked, and reads one that 
   expect((await readResolved(checked)).text).toHaveLength(MAX_BYTES - 1)
   await appendFile(join(project, 'big.md'), 'xx')
   await expect(readResolved(checked)).rejects.toThrow(/larger than 2 MB/)
+})
+
+it('lists markdown files whose names git would quote', async () => {
+  const { project } = await fixture()
+  await git(project, 'init', '-q')
+  await writeFile(join(project, 'café.md'), '# C\n')
+  const listed = await git(project, 'ls-files', '-z', '-co', '--', '*.md')
+  expect(markdownPaths(listed).toSorted()).toEqual(['café.md', 'plans/b.md'])
 })
 
 it('opens only markdown files that exist', async () => {
