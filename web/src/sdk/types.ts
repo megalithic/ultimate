@@ -115,6 +115,9 @@ export type ToolLineRenderer = Component<{ call: ToolCallView }>
  */
 export type LinkRenderer = Component<{ href: string; children: JSX.Element; core: JSX.Element }>
 
+/** A Markdown image's source and alt text; return `core` to keep the default image. */
+export type ImageRenderer = Component<{ src: string; alt: string; core: JSX.Element }>
+
 /**
  * An inline code span in Markdown (messages, reports): its text as `code`, `inLink` when it sits inside a link (which
  * is already a control: add no button there), and `core`, the rendering so far, starting with the default `<code>`.
@@ -378,6 +381,8 @@ export interface WebExtension {
   composer?: ComposerRenderer
   /** Renders links in Markdown; renderers compose in discovery order, each wrapping the one before it. */
   link?: LinkRenderer
+  /** Wrap or replace Markdown images. */
+  image?: ImageRenderer
   /** Renders inline code spans in Markdown; renderers compose in discovery order, each wrapping the one before it. */
   inlineCode?: InlineCodeRenderer
   /** Fenced code block renderers by language; they compose in discovery order, each wrapping the one before it. */

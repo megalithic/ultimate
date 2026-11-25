@@ -13,10 +13,11 @@ import {
   checkoutRoots,
   gitCommonDir,
   markdownPaths,
+  readImage,
   readResolved,
   resolveMarkdown,
 } from './paths.ts'
-import { FilesAction, ReadAction, ThreadAction, ThreadsDoc } from './refs.ts'
+import { FilesAction, ImageAction, ReadAction, ThreadAction, ThreadsDoc } from './refs.ts'
 import type { Thread } from './refs.ts'
 import { threadFor } from './threads.ts'
 import type { ThreadDeps } from './threads.ts'
@@ -70,9 +71,12 @@ const threadDeps = (host: ExtensionHost): ThreadDeps => ({
     }, context),
 })
 
-export const userActions = ['read', 'files', 'thread']
+export const userActions = ['read', 'image', 'files', 'thread']
 
 export const actions = {
+  image: implementAction(ImageAction, async (args, { host }) =>
+    readImage(fieldOf(args, 'path'), await rootsOf(host, conversationOf(args))),
+  ),
   read: implementAction(ReadAction, async (args, { host }) => {
     const file = await readResolved(
       await resolveMarkdown(fieldOf(args, 'path'), await rootsOf(host, conversationOf(args))),

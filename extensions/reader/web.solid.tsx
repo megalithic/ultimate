@@ -1,6 +1,7 @@
 import { FileTextIcon } from '@lucide/solid'
 import { defineWebExtension, isMac } from '@/sdk/solid'
 import { ReaderCard } from './card.solid.tsx'
+import { PathImage } from './image.solid.tsx'
 import { PathCode, PathLink, ReaderLink } from './link.solid.tsx'
 import { Picker, pickerDialog } from './picker.solid.tsx'
 import ReaderSurface from './surface.solid.tsx'
@@ -29,4 +30,5 @@ export default defineWebExtension({
   entries: { 'review.comments': ReaderCard },
   inlineCode: PathCode,
   link: PathLink,
+  image: PathImage,
 })

@@ -18,6 +18,7 @@ import type {
   EntryRenderer,
   InboxRenderer,
   InlineCodeRenderer,
+  ImageRenderer,
   LinkRenderer,
   PanelContribution,
   SlotName,
@@ -137,6 +138,7 @@ const shapes: Record<keyof WebExtension, [Check, string]> = {
   inbox: [isComponent, 'an inbox renderer component'],
   composer: [isComponent, 'a composer renderer component'],
   link: [isComponent, 'a link renderer component'],
+  image: [isComponent, 'an image renderer component'],
   inlineCode: [isComponent, 'an inline code renderer component'],
   codeBlocks: [objectOf(isComponent), 'an object of code block language → component'],
   messageActions: [arrayOf(isComponent), 'an array of message action components'],
@@ -476,6 +478,15 @@ export function toolLine(records: readonly ExtensionRecord[], name: string) {
       component: record.extension!.toolLines![name],
     }
   )
+}
+
+export function imageRenderers(
+  records: readonly ExtensionRecord[],
+): { extension: string; version: number; component: ImageRenderer }[] {
+  return records.flatMap((record) => {
+    const component = record.extension?.image
+    return component ? [{ extension: record.name, version: record.version, component }] : []
+  })
 }
 
 export function linkRenderers(

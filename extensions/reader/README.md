@@ -93,6 +93,11 @@ User-only actions (`refs.ts`), so codemode cannot call them:
   after `realpath`, so `..`, `~` and symlinks pointing out are refused. The file is then read through one handle
   opened without following a final symlink, whose real path must still be inside the root and the same file (device
   and inode), at most 2 MB plus one byte, so a swap or growth after the check is refused (`paths.ts` `readResolved`).
+- `image { path, conversation? }` → `{ data, mimeType }` (base64). PNG, JPEG, WebP and GIF regular files up to
+  8 MB, with the same roots, realpath checks and single-handle bounded read as `read`. SVG is not allowed.
+  Relative image destinations in read files are resolved beside the markdown file and rendered as data URLs;
+  absolute local paths use the same action. Chat images and remote image URLs are unchanged. A failed image shows
+  a quiet error line.
 - `files { conversation? }` → `{ files: [{ path, mtime }], truncated }`: `git ls-files -co --exclude-standard`
   markdown in the checkout, newest first, at most 2,000.
 - `thread { path, conversation }` → `{ id, from, path, started }`: the file's thread, the file resolved as `read` does
@@ -100,6 +105,7 @@ User-only actions (`refs.ts`), so codemode cannot call them:
 
 ## Privacy
 
-The reader reads local files only and writes no file. Its one server write is the `reader.threads` document: each
+The reader reads local markdown and image files only and writes no file. Image bytes are sent to the browser,
+not stored in a document or sent to a model; images outside the allowed roots cannot be read. Its one server write is the `reader.threads` document: each
 file's absolute path, relative path and thread, never its text or comments. Drafts stay in this browser's local storage
 until sent or discarded. Sent comments live only in the file's thread.

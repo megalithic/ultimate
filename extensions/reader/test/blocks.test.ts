@@ -185,6 +185,14 @@ it("rewrites a read file's relative links to its own folder, leaving code and ot
   })
 })
 
+it('resolves local images beside the read file without rewriting remote or data images', () => {
+  const source =
+    '![a](./x.png) ![](../a.webp) ![web](https://example.com/x.png) ![http](http://example.com/a.gif) ![data](data:image/png;base64,eA==) ![ref][r]\n\n[r]: ./ref.jpg'
+  expect(localLinks(source, '/work/docs')).toBe(
+    '![a](/work/docs/x.png) ![](/work/a.webp) ![web](https://example.com/x.png) ![http](http://example.com/a.gif) ![data](data:image/png;base64,eA==) ![ref][r]\n\n[r]: /work/docs/ref.jpg',
+  )
+})
+
 it("gives only the reader's own reviews its card, whose chips reopen the absolute file", () => {
   const spec = readSpec('/work/app/docs/plan.md')
   expect(isReadReview({ spec, comments: [] })).toBe(true)

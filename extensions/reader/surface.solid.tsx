@@ -72,6 +72,7 @@ import {
 } from './comments.ts'
 import type { Change, Draft, Drafts, Writing } from './comments.ts'
 import { notifyDrafts, tabId, useDrafts } from './drafts.solid.tsx'
+import { ImageConversation } from './image.solid.tsx'
 import { InReadFile, reachedLine, useLineTarget, usePath } from './link.solid.tsx'
 import { pickerDialog } from './picker.solid.tsx'
 import { ReadAction, ThreadAction, ThreadsDoc } from './refs.ts'
@@ -332,7 +333,9 @@ function Opened(props: ReaderProps & { phone: boolean }) {
           {(shownFile) => (
             <Show when={storeKey()} keyed>
               {(key) => (
-                <Document drafts={drafts()} file={shownFile()} storeKey={key} update={update} />
+                <ImageConversation value={() => props.origin}>
+                  <Document drafts={drafts()} file={shownFile()} storeKey={key} update={update} />
+                </ImageConversation>
               )}
             </Show>
           )}

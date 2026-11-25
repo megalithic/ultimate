@@ -1,4 +1,4 @@
-import type { Definition, Link, Nodes } from 'mdast'
+import type { Definition, Image, Link, Nodes } from 'mdast'
 import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import { unified } from 'unified'
@@ -192,6 +192,8 @@ function decoded(href: string) {
   }
 }
 
+export const imagePath = (src: string) => decoded(src)?.path ?? src
+
 const MARKDOWN_FILE = /\.(?:md|markdown)$/i
 
 export const isLocalHref = (href: string) =>
@@ -249,14 +251,24 @@ function destinationAt(markdown: string, from: number) {
   return end > start ? { from: start, to: end } : undefined
 }
 
-function destinationOf(markdown: string, node: Link | Definition) {
+function destinationOf(markdown: string, node: Link | Image | Definition) {
   const start = node.position?.start.offset
   if (start === undefined) return undefined
   if (node.type === 'definition') {
     const colon = markdown.indexOf(']:', start)
     return colon === -1 ? undefined : destinationAt(markdown, colon + 2)
   }
-  const textEnd = node.children.at(-1)?.position?.end.offset ?? start + 1
+  let textEnd: number
+  if (node.type === 'image') {
+    let depth = 1
+    textEnd = start + 2
+    for (; textEnd < markdown.length; textEnd++) {
+      const char = markdown[textEnd]
+      if (char === '\\') textEnd++
+      else if (char === '[') depth++
+      else if (char === ']' && --depth === 0) break
+    }
+  } else textEnd = node.children.at(-1)?.position?.end.offset ?? start + 1
   return markdown.startsWith('](', textEnd) ? destinationAt(markdown, textEnd + 2) : undefined
 }
 
@@ -266,7 +278,10 @@ const folderUrl = (folder: string) =>
 export function localLinks(markdown: string, absoluteFolder: string) {
   const edits: { from: number; to: number; href: string }[] = []
   const visit = (node: Nodes) => {
-    if ((node.type === 'link' || node.type === 'definition') && relativeHref(node.url)) {
+    if (
+      (node.type === 'link' || node.type === 'image' || node.type === 'definition') &&
+      relativeHref(node.url)
+    ) {
       const range = destinationOf(markdown, node)
       const url = new URL(node.url, folderUrl(absoluteFolder))
       if (range) edits.push({ ...range, href: url.pathname + url.search + url.hash })

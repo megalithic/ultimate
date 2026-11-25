@@ -23,6 +23,11 @@ export const ReadAction = actionRef<{ path: string; conversation?: ConversationI
   'reader',
   'read',
 )
+/** User only: a PNG, JPEG, WebP or GIF up to 8 MB, resolved within the same roots as `read`. */
+export const ImageAction = actionRef<
+  { path: string; conversation?: ConversationId },
+  { data: string; mimeType: string }
+>('reader', 'image')
 /** User only: `{ conversation? }` → the markdown files Git tracks or would track in that checkout, newest first. */
 export const FilesAction = actionRef<{ conversation?: ConversationId } | null, ReaderFiles>(
   'reader',

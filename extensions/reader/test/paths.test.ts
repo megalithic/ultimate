@@ -7,6 +7,8 @@ import {
   checkoutRoots,
   gitCommonDir,
   MAX_BYTES,
+  MAX_IMAGE_BYTES,
+  readImage,
   markdownPaths,
   readResolved,
   resolveMarkdown,
@@ -63,6 +65,24 @@ it('refuses a file that grew past 2 MB after it was checked, and reads one that 
   expect((await readResolved(checked)).text).toHaveLength(MAX_BYTES - 1)
   await appendFile(join(project, 'big.md'), 'xx')
   await expect(readResolved(checked)).rejects.toThrow(/larger than 2 MB/)
+})
+
+it('reads only bounded images inside the roots, including after resolving symlinks', async () => {
+  const { base, project, roots } = await fixture()
+  const bytes = Buffer.from('image bytes')
+  await writeFile(join(project, 'shot.png'), bytes)
+  expect(await readImage('shot.png', roots)).toEqual({
+    data: bytes.toString('base64'),
+    mimeType: 'image/png',
+  })
+  await writeFile(join(base, 'outside.png'), bytes)
+  await symlink(join(base, 'outside.png'), join(project, 'escape.png'))
+  await expect(readImage(join(base, 'outside.png'), roots)).rejects.toThrow(/outside the project/)
+  await expect(readImage('escape.png', roots)).rejects.toThrow(/outside the project/)
+  await expect(readImage('notes.txt', roots)).rejects.toThrow(/Only image/)
+  await expect(readImage('script.svg', roots)).rejects.toThrow(/Only image/)
+  await writeFile(join(project, 'large.webp'), Buffer.alloc(MAX_IMAGE_BYTES + 1))
+  await expect(readImage('large.webp', roots)).rejects.toThrow(/larger than 8 MB/)
 })
 
 it('lists markdown files whose names git would quote', async () => {

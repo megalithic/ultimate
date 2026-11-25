@@ -26,12 +26,18 @@ import {
   codeBlockRenderers,
   errorMessage,
   ExtensionName,
+  imageRenderers,
   inlineCodeRenderers,
   linkRenderers,
   useCopy,
   useExtensions,
 } from '../../sdk/hooks.ts'
-import type { CodeBlockRenderer, InlineCodeRenderer, LinkRenderer } from '../../sdk/hooks.ts'
+import type {
+  CodeBlockRenderer,
+  ImageRenderer,
+  InlineCodeRenderer,
+  LinkRenderer,
+} from '../../sdk/hooks.ts'
 import { highlight, plainLines } from './highlight.ts'
 import type { Line } from './highlight.ts'
 import {
@@ -88,6 +94,21 @@ function ContributionError(props: { extension: string; error: unknown; inner: JS
       </span>
       {props.inner}
     </>
+  )
+}
+
+function Image(props: { attributes: Record<string, unknown> }) {
+  const renderers = createMemo(() => imageRenderers(useExtensions()()) as Rendered[])
+  const core = () => <img alt="" {...props.attributes} />
+  return (
+    <Contributed<Parameters<ImageRenderer>[0]>
+      core={core}
+      props={{
+        src: typeof props.attributes.src === 'string' ? props.attributes.src : '',
+        alt: typeof props.attributes.alt === 'string' ? props.attributes.alt : '',
+      }}
+      renderers={renderers()}
+    />
   )
 }
 
@@ -486,7 +507,7 @@ function ElementNode(props: { node: Element; context: Context }): JSX.Element {
       </Match>
       <Match when={props.node.tagName === 'img'}>
         <span class="image">
-          <img alt="" {...attributes()} />
+          <Image attributes={attributes()} />
         </span>
       </Match>
       <Match when={onlyImage(props.node)}>{children()}</Match>
