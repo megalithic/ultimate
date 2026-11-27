@@ -12,6 +12,28 @@ import {
 } from '../comments.ts'
 import { sha256 } from '../sha256.ts'
 
+it('validates image lists and numbers them across comments', () => {
+  const comment = {
+    file: 'doc.md',
+    side: 'new',
+    start: 1,
+    end: 1,
+    excerpt: '',
+    text: 'Look',
+    images: ['/attachments/a.png'],
+  }
+  const review = checkReview({ spec: 'read:doc.md', comments: [comment, comment] })
+  expect(review.comments[0].images).toEqual(comment.images)
+  expect(reviewText(review)).toContain('image 2')
+  for (const images of ['path', [42], Array(5).fill('path')])
+    expect(() => checkReview({ spec: 'x', comments: [{ ...comment, images }] })).toThrow(
+      'at most 4 paths',
+    )
+  expect(() =>
+    checkReview({ spec: 'x', comments: Array.from({ length: 9 }, () => ({ ...comment })) }),
+  ).toThrow('8 images')
+})
+
 const bytes = (text: string) => new TextEncoder().encode(text).length
 
 it('fences excerpts so their backticks cannot close the fence, with a language from the path', () => {

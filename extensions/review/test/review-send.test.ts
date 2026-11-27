@@ -112,6 +112,44 @@ it('sends one review input to a conversation, refuses bad reviews, and is user-o
       ),
     ).toHaveLength(1)
 
+    const imagePath = join(home, 'state', 'attachments', 'screen.png')
+    await mkdir(join(home, 'state', 'attachments'), { recursive: true })
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+      'base64',
+    )
+    await writeFile(imagePath, png)
+    server.host.faux!.setResponses([fauxAssistantMessage('Screenshot received.')])
+    expect(
+      (
+        await send({
+          conversation: target,
+          spec: 'screen',
+          comments: [comment({ images: [imagePath] })],
+        })
+      ).status,
+    ).toBe(200)
+    await server.harness.waitForIdle(context)
+    const imageReview = (await conversation.context(context)).entries.findLast(
+      (entry) => entry.kind === 'review.comments',
+    )!
+    const imageMessage = imageReview.model?.[0]
+    expect(imageMessage && 'content' in imageMessage ? imageMessage.content : undefined).toEqual([
+      { type: 'text', text: expect.stringContaining('image 1') },
+      { type: 'image', mimeType: 'image/png', data: png.toString('base64') },
+    ])
+    const outside = join(home, 'outside.png')
+    await writeFile(outside, png)
+    expect(
+      (
+        await send({
+          conversation: target,
+          spec: 'screen',
+          comments: [comment({ images: [outside] })],
+        })
+      ).status,
+    ).not.toBe(200)
+
     // Without a branch, landing or trailer behind the spec, a review goes to the primary agent.
     const standing = await post(server, '/api/extensions/subagents/actions/standing', {
       args: { name: 'ultimate' },

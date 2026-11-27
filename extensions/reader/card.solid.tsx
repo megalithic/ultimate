@@ -1,5 +1,6 @@
 import { FileTextIcon } from '@lucide/solid'
 import { For, Show } from 'solid-js'
+import { imagesOf } from '../../lib/entries.ts'
 import { Button } from '@/components/ui/button.solid.tsx'
 import { Fold } from '@/sdk/solid'
 import type { SolidEntryProps } from '@/sdk/solid'
@@ -16,16 +17,23 @@ export function ReaderCard(props: SolidEntryProps) {
       when={isReadReview(props.entry.data) && (props.entry.data as ReviewComments)}
       fallback={props.core}
     >
-      {(review) => <SentRead id={props.entry.id} review={review()} />}
+      {(review) => (
+        <SentRead id={props.entry.id} images={imagesOf(props.entry)} review={review()} />
+      )}
     </Show>
   )
 }
 
-function SentRead(props: { id: number; review: ReviewComments }) {
+function SentRead(props: {
+  id: number
+  review: ReviewComments
+  images: { data: string; mimeType: string }[]
+}) {
   const title = () => (
     <>
-      Read · {props.review.comments.length} comment{props.review.comments.length === 1 ? '' : 's'}{' '}
-      on <span class="text-foreground/85">{props.review.comments[0]?.file ?? ''}</span>
+      Read · {props.review.comments.length} comment
+      {props.review.comments.length === 1 ? '' : 's'} on{' '}
+      <span class="text-foreground/85">{props.review.comments[0]?.file ?? ''}</span>
     </>
   )
   return (
@@ -59,6 +67,14 @@ function SentRead(props: { id: number; review: ReviewComments }) {
               {(comment, index) => (
                 <Comment
                   comment={comment}
+                  images={props.images.slice(
+                    props.review.comments
+                      .slice(0, index())
+                      .reduce((sum, item) => sum + (item.images?.length ?? 0), 0),
+                    props.review.comments
+                      .slice(0, index() + 1)
+                      .reduce((sum, item) => sum + (item.images?.length ?? 0), 0),
+                  )}
                   index={index() + 1}
                   review={props.id}
                   spec={props.review.spec}
@@ -72,7 +88,13 @@ function SentRead(props: { id: number; review: ReviewComments }) {
   )
 }
 
-function Comment(props: { comment: ReviewComment; index: number; review: number; spec: string }) {
+function Comment(props: {
+  comment: ReviewComment
+  index: number
+  review: number
+  spec: string
+  images: { data: string; mimeType: string }[]
+}) {
   const at = () => `${props.comment.file}:${linesOf(props.comment)}`
   return (
     <li class="space-y-1.5 px-3 py-2.5">
@@ -93,6 +115,17 @@ function Comment(props: { comment: ReviewComment; index: number; review: number;
           {props.comment.excerpt}
         </blockquote>
       </Show>
+      <div class="flex flex-wrap gap-2">
+        <For each={props.images}>
+          {(image, index) => (
+            <img
+              alt={`Comment ${props.index} attachment ${index() + 1}`}
+              class="size-20 rounded border object-contain"
+              src={`data:${image.mimeType};base64,${image.data}`}
+            />
+          )}
+        </For>
+      </div>
       <p class="text-[13.5px] leading-relaxed break-words whitespace-pre-wrap">
         {props.comment.text}
       </p>

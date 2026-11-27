@@ -31,6 +31,11 @@ comment's `file:line` chip opening Review there. The model reads `reviewText` (`
 (language from the extension) and the text. Paths and specs are inline code delimited by a backtick run longer than any
 in them, with control characters such as a newline written as`\n`.
 
+Comments may also carry `images: string[]`: absolute attachment paths, at most four per comment and eight per review.
+Send accepts only supported image data up to `maxImageBytes` whose real path is inside the host's attachments folder.
+The input includes real image blocks in comment order; `reviewText` numbers them across comments. Missing files are
+skipped with an “image N is no longer available” note. Text-only inputs stay plain strings.
+
 Links: `/?review=<spec>` opens Review at that spec, and the address carries `?review=` while Review is on screen;
 `&file=<path>&line=<n>` (and `&side=old`) scrolls to that line and marks it.
 `events.emit('review:open', { spec, at })` does the same from code, with optional `at: { file, line, side }`. Review

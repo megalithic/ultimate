@@ -13,6 +13,7 @@ import { SubagentsApi } from '../subagents/api.ts'
 import { SubmissionLanded, WorkspacesApi } from '../workspaces/api.ts'
 import { checkReview, reviewText } from './comments.ts'
 import { reviewDiff } from './diff.ts'
+import { reviewImage } from './images.ts'
 import { DiffAction, RangesAction, RecipientAction, SendAction } from './refs.ts'
 import { ReviewCommentsEntry } from './entries.ts'
 import type { ReviewRange } from './refs.ts'
@@ -226,7 +227,26 @@ export const actions = {
     const review = checkReview(args)
     const conversation = await host.harness().conversation(id, context)
     if (!conversation) throw new Error(`No conversation #${id}`)
-    const content = reviewText(review)
+    const text = reviewText(review)
+    const images: Awaited<ReturnType<typeof reviewImage>>[] = []
+    const missing: string[] = []
+    let number = 0
+    for (const comment of review.comments) {
+      const kept: string[] = []
+      for (const path of comment.images ?? []) {
+        number++
+        try {
+          images.push(await reviewImage(host.home, path))
+          kept.push(path)
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+          missing.push(`image ${number} is no longer available`)
+        }
+      }
+      if (comment.images) comment.images = kept
+    }
+    const message = [text, ...missing].join('\n\n')
+    const content = images.length ? [{ type: 'text' as const, text: message }, ...images] : message
     const submission = await conversation.submit(
       {
         type: 'input',
@@ -247,7 +267,7 @@ export const actions = {
           ...(admittedInput.entry === undefined
             ? { submission: submission.id }
             : { entry: admittedInput.entry }),
-          length: content.length,
+          length: message.length,
           ...device,
         }),
       context,

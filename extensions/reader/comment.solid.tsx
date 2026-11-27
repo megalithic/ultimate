@@ -1,9 +1,14 @@
-import { CircleAlertIcon, MessageSquareIcon, PencilIcon, Trash2Icon } from '@lucide/solid'
-import { onSettled, Show } from 'solid-js'
+import { CircleAlertIcon, MessageSquareIcon, PencilIcon, Trash2Icon, XIcon } from '@lucide/solid'
+import { createSignal, For, onCleanup, onSettled, Show } from 'solid-js'
+import { droppedFiles, imageFiles, pastedFiles } from '@/components/image-paste.ts'
 import { Button } from '@/components/ui/button.solid.tsx'
 import { Form } from '@/components/ui/form.solid.tsx'
 import { Textarea } from '@/components/ui/input.solid.tsx'
-import { cn } from '@/sdk/solid'
+import { api, cn, errorMessage, writerNow, writingAs } from '@/sdk/solid'
+import { imageMimeTypes, maxImages } from '../../shared/protocol.ts'
+import { UploadAction } from '../attachments/refs.ts'
+import type { CommentImage } from './comments.ts'
+import { prepareImage } from './images.solid.tsx'
 import { limits } from './comments.ts'
 
 type Lines = { start: number; end: number }
@@ -30,19 +35,60 @@ export function Composer(props: {
   lines: Lines
   excerpt: string
   text: string
+  images?: CommentImage[]
+  onImages?: (images: CommentImage[]) => void
   refused?: boolean
   submit: string
   onText: (text: string) => void
   onSubmit: (text: string) => void
   onCancel: () => void
 }) {
+  const [uploading, setUploading] = createSignal(false)
+  const [error, setError] = createSignal<string>()
+  let pending = false
+  let alive = true
+  onCleanup(() => {
+    alive = false
+  })
+  async function attach(files: File[]) {
+    if (pending) return
+    const accepted = imageFiles(files)
+    const current = [...(props.images ?? [])]
+    if (current.length + accepted.length > maxImages) {
+      setError('Attach up to 4 images per comment')
+      return
+    }
+    const source = writerNow()
+    const onImages = props.onImages
+    pending = true
+    setUploading(true)
+    setError(undefined)
+    try {
+      for (const file of accepted) {
+        const { image, thumb } = await prepareImage(file)
+        const { path } = await api.action(UploadAction, {
+          name: `image.${image.mimeType.split('/')[1]}`,
+          data: image.data,
+        })
+        if (!alive) return
+        current.push({ path, thumb })
+        writingAs(source, () => onImages?.([...current]))
+      }
+    } catch (failure) {
+      if (alive) setError(errorMessage(failure))
+    } finally {
+      pending = false
+      if (alive) setUploading(false)
+    }
+  }
   let field: HTMLTextAreaElement | undefined
   onSettled(() => {
     field?.focus({ preventScroll: true })
     field?.setSelectionRange(field.value.length, field.value.length)
     field?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   })
-  const ready = () => props.text.trim().length > 0 && props.text.length <= limits.text
+  const ready = () =>
+    !uploading() && props.text.trim().length > 0 && props.text.length <= limits.text
   return (
     <Form
       class="my-3 rounded-md border border-brand/40 bg-card font-sans text-[13px] leading-relaxed shadow-sm"
@@ -63,12 +109,63 @@ export function Composer(props: {
         onKeyDown={(event) => {
           if (event.key === 'Escape') props.onCancel()
         }}
+        onPaste={(event) => {
+          const files = pastedFiles(event, (file) => imageMimeTypes.includes(file.type))
+          if (!files.length) return
+          event.preventDefault()
+          void attach(files)
+        }}
+        onDragOver={(event) => {
+          if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
+        }}
+        onDrop={(event) => {
+          const files = droppedFiles(event, (file) => imageMimeTypes.includes(file.type))
+          if (!files.length) return
+          event.preventDefault()
+          void attach(files)
+        }}
         onValueChange={(text) => props.onText(text)}
         placeholder="What should change here?"
         ref={field}
         submitShortcut="mod+enter"
         value={props.text}
       />
+      <Show when={(props.images?.length ?? 0) > 0 || uploading()}>
+        <div class="flex flex-wrap items-center gap-2 px-3 pt-1 pb-2">
+          <For each={props.images ?? []}>
+            {(image, index) => (
+              <div class="relative">
+                <img
+                  alt={`Comment attachment ${index() + 1}`}
+                  class="size-16 rounded border border-border/70 bg-terminal object-contain"
+                  src={image.thumb}
+                />
+                <Button
+                  aria-label={`Remove comment image ${index() + 1}`}
+                  class="absolute -top-1.5 -right-1.5 size-4.5 rounded-full border bg-background p-0 text-foreground hover:bg-accent"
+                  disabled={uploading()}
+                  onClick={() =>
+                    props.onImages?.((props.images ?? []).filter((_, at) => at !== index()))
+                  }
+                  size={null}
+                  type="button"
+                  variant={null}
+                >
+                  <XIcon class="size-3" />
+                </Button>
+              </div>
+            )}
+          </For>
+          <Show when={uploading()}>
+            <span class="font-mono text-[11px] text-muted-foreground">Uploading image…</span>
+          </Show>
+        </div>
+      </Show>
+      <Show when={error()}>
+        <p class="px-3 pb-1.5 font-mono text-[11px] text-error" role="alert">
+          {error()}
+        </p>
+      </Show>
       <div class="flex items-center justify-end gap-2 border-t border-border/60 px-2 py-1.5">
         {props.text.length > limits.text ? (
           <span class="mr-auto font-mono text-[11px] text-error">
@@ -113,6 +210,7 @@ export function Composer(props: {
 
 export function DraftCard(props: {
   id: string
+  images?: CommentImage[]
   lines: Lines
   excerpt: string
   text: string
@@ -178,6 +276,17 @@ export function DraftCard(props: {
       <Quote class="mx-3 mt-1 line-clamp-1" text={props.excerpt} />
       <div class="px-3 pt-1 pb-2 break-words whitespace-pre-wrap text-foreground/90">
         {props.text}
+      </div>
+      <div class="flex flex-wrap gap-2 px-3 pb-2">
+        <For each={props.images ?? []}>
+          {(image, index) => (
+            <img
+              alt={`Pending comment attachment ${index() + 1}`}
+              class="size-16 rounded border object-contain"
+              src={image.thumb}
+            />
+          )}
+        </For>
       </div>
       <Show when={props.deleteRefused}>
         <p class="px-3 pb-2 font-mono text-[11px] text-error" data-reader-unsaved="" role="alert">

@@ -7,7 +7,18 @@ export const limits = {
   excerptBytes: 8 * 1024,
 } as const
 
+export type CommentImage = { path: string; thumb: string }
+
+const validImages = (value: unknown): value is CommentImage[] | undefined =>
+  value === undefined ||
+  (Array.isArray(value) &&
+    value.length <= 4 &&
+    value.every(
+      (image) => !!image && typeof image.path === 'string' && typeof image.thumb === 'string',
+    ))
+
 export type Draft = {
+  images?: CommentImage[]
   id: string
   start: number
   end: number
@@ -59,6 +70,7 @@ const isDraft = (value: unknown): value is Draft =>
   typeof value === 'object' &&
   typeof (value as Draft).id === 'string' &&
   typeof (value as Draft).text === 'string' &&
+  validImages((value as Draft).images) &&
   Number.isSafeInteger((value as Draft).start) &&
   Number.isSafeInteger((value as Draft).end)
 
@@ -152,7 +164,8 @@ const same = (a: Draft, b: Draft) =>
   a.end === b.end &&
   a.text === b.text &&
   a.excerpt === b.excerpt &&
-  a.anchor === b.anchor
+  a.anchor === b.anchor &&
+  JSON.stringify(a.images ?? []) === JSON.stringify(b.images ?? [])
 
 export const withoutSent =
   (sent: Drafts): Change =>
@@ -179,6 +192,7 @@ export async function sendDrafts<T>(
 }
 
 export type Writing = {
+  images?: CommentImage[]
   start: number
   end: number
   excerpt: string
@@ -219,7 +233,8 @@ export function loadWriting(
     typeof value.excerpt !== 'string' ||
     typeof value.anchor !== 'string' ||
     !Number.isSafeInteger(value.start) ||
-    !Number.isSafeInteger(value.end)
+    !Number.isSafeInteger(value.end) ||
+    !validImages(value.images)
   )
     return undefined
   const writing = value as Writing
@@ -230,6 +245,7 @@ export function loadWriting(
     excerpt: writing.excerpt,
     anchor: writing.anchor,
     text: writing.text,
+    ...(writing.images && { images: writing.images }),
     ...(typeof writing.id === 'string' && { id: writing.id }),
     ...(writing.refused === true && { refused: true as const }),
   }
@@ -241,6 +257,8 @@ export function sendProblem(drafts: Drafts) {
   if (!drafts.comments.length) return 'Add a comment to send'
   if (drafts.comments.length > limits.comments)
     return `At most ${limits.comments} comments per review`
+  if (drafts.comments.reduce((total, draft) => total + (draft.images?.length ?? 0), 0) > 8)
+    return 'At most 8 images per review'
   if (drafts.note.length > limits.text)
     return `The note is ${count(drafts.note.length)} characters, over the ${count(limits.text)} a review allows: shorten it to send`
   if (drafts.comments.some((draft) => draft.text.length > limits.text))

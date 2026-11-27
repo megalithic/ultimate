@@ -5,6 +5,11 @@ export type ReviewComment = {
   end: number
   excerpt: string
   text: string
+  images?: string[]
 }
 
-export type ReviewComments = { spec: string; comments: ReviewComment[]; note?: string }
+export type ReviewComments = {
+  spec: string
+  comments: ReviewComment[]
+  note?: string
+}

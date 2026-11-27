@@ -269,7 +269,10 @@ function Opened(props: ReaderProps & { phone: boolean }) {
 
   const deliver = async (sent: ReadFile, from: ConversationId, snapshot: Drafts) => {
     const lines = sent.text.replace(/\r\n?/g, '\n').split('\n')
-    const thread = await api.action(ThreadAction, { path: sent.absolute, conversation: from })
+    const thread = await api.action(ThreadAction, {
+      path: sent.absolute,
+      conversation: from,
+    })
     const result = await api.action(SendAction, {
       conversation: thread.id,
       spec: readSpec(sent.absolute),
@@ -283,6 +286,9 @@ function Opened(props: ReaderProps & { phone: boolean }) {
             end: at.end,
             excerpt: draft.excerpt,
             text: draft.text,
+            ...(draft.images?.length && {
+              images: draft.images.map((image) => image.path),
+            }),
           }
         })
         .toSorted((a, b) => a.start - b.start || a.end - b.end),
@@ -587,7 +593,7 @@ function Document(props: {
       ? props.drafts.comments.find((draft) => draft.id === current.id)
       : undefined
     const draft: Draft = editing
-      ? { ...editing, text: body }
+      ? { ...editing, text: body, images: current.images }
       : {
           id: crypto.randomUUID(),
           start: current.start,
@@ -595,6 +601,7 @@ function Document(props: {
           excerpt: current.excerpt,
           anchor: current.anchor,
           text: body,
+          images: current.images,
         }
     write(added(current, props.update(putComment(draft))))
   }
@@ -618,6 +625,7 @@ function Document(props: {
                   >
                     {(item) => (
                       <DraftCard
+                        images={item().draft.images}
                         changed={item().at.changed}
                         editBlocked={busyReason(writing())}
                         excerpt={item().draft.excerpt}
@@ -638,6 +646,7 @@ function Document(props: {
                             excerpt: item().draft.excerpt,
                             anchor: item().draft.anchor,
                             text: item().draft.text,
+                            images: item().draft.images,
                             id: item().draft.id,
                           })
                         }
@@ -648,6 +657,8 @@ function Document(props: {
                   <Show when={writingBlock() === index && writing()}>
                     {(current) => (
                       <Composer
+                        images={current().images}
+                        onImages={(images) => write({ ...current(), images })}
                         excerpt={current().excerpt}
                         lines={current()}
                         onCancel={() => write(undefined)}

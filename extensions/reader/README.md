@@ -50,6 +50,12 @@ without a worktree, and its prompt names the file. The footer's button reads `Se
 
 ## Comments
 
+Paste or drop PNG, JPEG, WebP or GIF screenshots into a comment: up to four per comment and eight per review.
+Text is still required. Images are resized and uploaded immediately; small previews stay with the browser's draft,
+with a remove button, upload progress and errors. Draft and sent cards show thumbnails; the recipient sees real image
+blocks, numbered across the review so each screenshot stays tied to its comment. Uploads expire after 30 days;
+a missing image is noted when sending.
+
 Select text in one or more blocks and press **Comment** (in the margin beside the selection, or a pill at the bottom on
 narrow screens). The comment covers the source lines the selection spans (`blocks.ts` `selectedLines`); its excerpt is
 the selected text, capped like Review's (40 lines, 8 KB). **Add comment** (⌘↵) pins a draft under the block, editable
@@ -105,7 +111,8 @@ User-only actions (`refs.ts`), so codemode cannot call them:
 
 ## Privacy
 
-The reader reads local markdown and image files only and writes no file. Image bytes are sent to the browser,
-not stored in a document or sent to a model; images outside the allowed roots cannot be read. Its one server write is the `reader.threads` document: each
-file's absolute path, relative path and thread, never its text or comments. Drafts stay in this browser's local storage
+The reader reads local markdown and image files and uploads comment screenshots to the host's attachments folder.
+Images in a read file are sent to the browser, not stored in a document or sent to a model; images outside the
+allowed roots cannot be read. Its thread state is the `reader.threads` document: each file's absolute path, relative
+path and thread, never its text or comments. Drafts stay in this browser's local storage
 until sent or discarded. Sent comments live only in the file's thread.

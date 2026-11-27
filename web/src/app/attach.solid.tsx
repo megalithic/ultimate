@@ -4,11 +4,11 @@ import type { Accessor } from 'solid-js'
 import { ToolImage } from '@/components/ai/tool.solid.tsx'
 import { FileChip } from '@/components/file-chip.solid.tsx'
 import { typeLabel } from '@/components/file-kind.ts'
-import { fitImage } from '@/components/image-resize.ts'
+import { droppedFiles, imageFiles, pastedFiles, readImage } from '@/components/image-paste.ts'
 import { Button } from '@/components/ui/button.solid.tsx'
 import { errorMessage, formatBytes } from '../sdk/hooks.ts'
 import type { FileUpload } from '../sdk/hooks.ts'
-import { imageMimeTypes, maxImages } from '../../../shared/protocol.ts'
+import { maxImages } from '../../../shared/protocol.ts'
 import type { DraftFile, PastedImage } from './attachments.ts'
 
 export type Upload = NonNullable<typeof FileUpload.value>
@@ -57,9 +57,9 @@ export function createAttach(options: {
   async function attach(dropped: readonly File[]) {
     if (pending || options.disabled()) return
     const upload = options.upload()
-    const files = upload ? dropped.filter((file) => imageMimeTypes.includes(file.type)) : dropped
+    const files = upload ? imageFiles(dropped) : dropped
     const others = dropped.filter((file) => !files.includes(file))
-    const supported = files.filter((file) => imageMimeTypes.includes(file.type))
+    const supported = imageFiles(files)
     const accepted = supported.slice(0, Math.max(0, maxImages - options.images().length))
     const problems = [
       ...(upload && others.length ? send(others, upload) : []),
@@ -71,7 +71,9 @@ export function createAttach(options: {
     pending = true
     setReading(true)
     try {
-      const results = await Promise.allSettled(accepted.map(read))
+      const results = await Promise.allSettled(
+        accepted.map(async (file) => (await readImage(file)).image),
+      )
       const added = results.flatMap((result) =>
         result.status === 'fulfilled' ? [result.value] : [],
       )
@@ -94,42 +96,18 @@ export function createAttach(options: {
       event.preventDefault()
       return
     }
-    const files = Array.from(event.clipboardData?.items ?? [])
-      .filter((item) => item.kind === 'file' && accepts(item))
-      .flatMap((item) => {
-        const file = item.getAsFile()
-        return file ? [file] : []
-      })
+    const files = pastedFiles(event, accepts)
     if (!files.length) return
     event.preventDefault()
     await attach(files)
   }
 
   async function drop(event: DragEvent) {
-    const files = Array.from(event.dataTransfer?.files ?? []).filter(accepts)
+    const files = droppedFiles(event, accepts)
     if (files.length) await attach(files)
   }
 
   return { paste, drop, attach, reading, busy: () => pending }
-}
-
-async function read(file: File): Promise<PastedImage> {
-  const { blob, note: composerOnlyResizeNote } = await fitImage(file)
-  const data = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.addEventListener('load', () =>
-      typeof reader.result === 'string'
-        ? resolve(reader.result.split(',')[1])
-        : reject(new Error('Could not read pasted image')),
-    )
-    reader.addEventListener('error', () => reject(new Error('Could not read pasted image')))
-    reader.readAsDataURL(blob)
-  })
-  return {
-    data,
-    mimeType: blob.type,
-    ...(composerOnlyResizeNote && { note: composerOnlyResizeNote }),
-  }
 }
 
 const removeClass =

@@ -80,6 +80,22 @@ function tab(shared: ReturnType<typeof storage>) {
 const PREFIX = draftsKey('/work/app/docs/plan.md')
 const TAB = 'tab-a'
 
+it('keeps images in drafts and writing and caps images across the review', () => {
+  const store = storage()
+  const images = [{ path: '/home/attachments/screen.png', thumb: 'data:image/jpeg;base64,eA==' }]
+  const comment = { ...draft('screen'), images }
+  expect(putComment(comment)(store, PREFIX)).toBe(true)
+  expect(readDrafts(store, PREFIX).comments).toEqual([comment])
+  saveWriting(comment, TAB)(store, PREFIX)
+  expect(loadWriting(store, PREFIX, ['x'], TAB)?.images).toEqual(images)
+  expect(
+    sendProblem({ note: '', comments: Array.from({ length: 8 }, () => comment) }),
+  ).toBeUndefined()
+  expect(sendProblem({ note: '', comments: Array.from({ length: 9 }, () => comment) })).toContain(
+    '8 images',
+  )
+})
+
 it('keeps both comments when two tabs write at once, each change touching only its own key', () => {
   const shared = storage()
   const a = tab(shared)

@@ -77,7 +77,14 @@ export function checkReview(input: unknown): ReviewComments {
   const checked = comments.map((comment, index): ReviewComment => {
     const at = `comments[${index}]`
     if (!record(comment)) throw new Error(`${at} must be an object`)
-    const { file, side, start, end, excerpt, text } = comment
+    const { file, side, start, end, excerpt, text, images } = comment
+    if (
+      images !== undefined &&
+      (!Array.isArray(images) ||
+        images.length > 4 ||
+        images.some((path) => typeof path !== 'string'))
+    )
+      throw new Error(`${at}.images must be a list of at most 4 paths`)
     if (typeof file !== 'string' || !file) throw new Error(`${at}.file must be a path`)
     if (side !== 'old' && side !== 'new') throw new Error(`${at}.side must be old or new`)
     if (!line(start) || !line(end) || end < start)
@@ -90,9 +97,23 @@ export function checkReview(input: unknown): ReviewComments {
       throw new Error(`${at}.excerpt is longer than ${limits.excerptLines} lines`)
     if (new TextEncoder().encode(excerpt).length > limits.excerptBytes)
       throw new Error(`${at}.excerpt is larger than ${limits.excerptBytes / 1024} KB`)
-    return { file, side, start, end, excerpt, text }
+    return {
+      file,
+      side,
+      start,
+      end,
+      excerpt,
+      text,
+      ...(images && { images: images as string[] }),
+    }
   })
-  return { spec, comments: checked, ...(note?.trim() ? { note: note.trim() } : {}) }
+  if (checked.reduce((total, comment) => total + (comment.images?.length ?? 0), 0) > 8)
+    throw new Error('At most 8 images per review')
+  return {
+    spec,
+    comments: checked,
+    ...(note?.trim() ? { note: note.trim() } : {}),
+  }
 }
 
 const languages: Record<string, string> = {
@@ -157,6 +178,7 @@ const plural = (count: number) => `${count} comment${count === 1 ? '' : 's'}`
 export function reviewText({ spec, comments, note }: ReviewComments) {
   const parts = [`Review of ${code(spec)} (${plural(comments.length)})`]
   if (note) parts.push(note)
+  let imageNumber = 0
   for (const comment of comments) {
     const quote = fenceLongerThanExcerptBackticks(comment.excerpt)
     parts.push(
@@ -164,6 +186,11 @@ export function reviewText({ spec, comments, note }: ReviewComments) {
         `${code(location(comment))} (${comment.side})`,
         ...(comment.excerpt ? [`${quote}${languageOf(comment.file)}`, comment.excerpt, quote] : []),
         comment.text.trim(),
+        ...(comment.images?.length
+          ? [
+              `[${comment.images.length} images attached: ${comment.images.map(() => `image ${++imageNumber}`).join(', ')}]`,
+            ]
+          : []),
       ].join('\n'),
     )
   }
