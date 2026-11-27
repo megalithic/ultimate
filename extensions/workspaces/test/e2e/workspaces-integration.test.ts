@@ -1004,6 +1004,67 @@ async function lander(
   f.host.projectSettings = async () => ({ lander: settings })
   return f
 }
+it.concurrent('adopts an external worktree, lands its submission and releases only the record', async () => {
+  const f = await lander({ checks: ['test -f adopted.txt'] })
+  const conversation = await f.opened.harness.createConversation(
+    { ownership: { kind: 'ownerless' } },
+    context,
+  )
+  const id = conversation.id
+  const path = join(f.directory, 'external')
+  await git(f.projectRoot, 'worktree', 'add', '-b', 'feature', path)
+  await f.opened.harness.commit(async (tx) => {
+    await tx.appendEntry(id, { kind: 'test.submission', data: {} })
+    await f.service.adopt(tx, id, path)
+  }, context)
+  const workspace = (await f.service.get(id, context))!
+  expect(workspace).toMatchObject({
+    path: await realpath(path),
+    branch: 'feature',
+    source: await realpath(f.projectRoot),
+    target: 'main',
+    base: await git(f.projectRoot, 'rev-parse', 'HEAD'),
+    state: 'ready',
+    external: true,
+  })
+  expect((await conversation.agent(context)).cwd).toBe(workspace.path)
+  expect(
+    await f.opened.harness.commit(
+      async (tx) =>
+        (await tx.scanTasks({ conversationId: id, kind: 'workspaces.prepare' }, 1)).items,
+      context,
+    ),
+  ).toEqual([])
+  await commit(path, 'adopted.txt')
+  const tip = await git(path, 'rev-parse', 'HEAD')
+  await f.service.submit(id, 'None', context)
+  expect((await submitted(f, id))[0]).toContain('landed as')
+  expect(await git(f.projectRoot, 'rev-parse', 'HEAD')).toBe(tip)
+  expect(await readFile(join(f.projectRoot, 'adopted.txt'), 'utf8')).toBe('adopted.txt')
+  expect(await f.host.eventLog.recent({ events: [SubmissionLanded] })).toHaveLength(1)
+  expect(await f.service.release([id], context)).toEqual([])
+  expect((await f.service.get(id, context))!.state).toBe('removed')
+  await f.service.ready(id, context)
+  await f.service.sweep(context)
+  expect((await f.service.get(id, context))!.state).toBe('removed')
+  await access(path)
+  expect(await git(f.projectRoot, 'rev-parse', 'refs/heads/feature')).toBe(tip)
+  expect(await git(f.projectRoot, 'worktree', 'list', '--porcelain')).toContain(workspace.path)
+})
+it.concurrent('rejects adopting the target checkout or a conversation with a workspace', async () => {
+  const f = await fixture()
+  const conversation = await f.opened.harness.createConversation(
+    { ownership: { kind: 'ownerless' } },
+    context,
+  )
+  const adopt = (path: string) =>
+    f.opened.harness.commit((tx) => f.service.adopt(tx, conversation.id, path), context)
+  await expect(adopt(f.projectRoot)).rejects.toThrow('branch must differ from target')
+  const path = join(f.directory, 'external')
+  await git(f.projectRoot, 'worktree', 'add', '-b', 'feature', path)
+  await adopt(path)
+  await expect(adopt(path)).rejects.toThrow('Conversation already has a workspace')
+})
 it.concurrent('lets an ownerless history fork submit its own workspace', async () => {
   const f = await lander({ checks: ['test -f base.txt'] })
   const entry = await f.opened.harness.commit(

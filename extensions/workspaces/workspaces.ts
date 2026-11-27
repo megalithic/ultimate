@@ -2,7 +2,7 @@ import { parseConversationId } from '../../lib/ids.ts'
 import type { ConversationId, Cursor, Tx } from '@earendil-works/pi-durable'
 import { createHash } from 'node:crypto'
 import { lstat, mkdir, readdir, realpath, rm } from 'node:fs/promises'
-import { isAbsolute, join, relative, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import type { Context } from '@earendil-works/chord/context'
 import {
   configure,
@@ -518,6 +518,12 @@ export function workspaces(host: Host) {
     workspace: WorkspaceIndex['items'][string],
     context: Context,
   ) {
+    if (workspace.external) {
+      await host.harness().commit(async (tx) => {
+        ;(await tx.doc(Workspaces, ROOT_CONVERSATION_ID)).items[String(id)].state = 'removed'
+      }, context)
+      return undefined
+    }
     let item: KeptWork = { id, uncommitted: 0, unlanded: 0 }
     try {
       if (await listedBySource(workspace)) {
@@ -581,6 +587,10 @@ export function workspaces(host: Host) {
       await serializeSourceWrites(record.source, async () => {
         if (signal?.aborted) return
         const workspace = (await get(id, context))!
+        if (workspace.external) {
+          await finishRemoval(id, workspace, context)
+          return
+        }
         if (workspace.state === 'preparing') {
           kept.push({ id, uncommitted: 0, unlanded: 0, busy: 'Workspace is preparing' })
           return
@@ -855,7 +865,7 @@ export function workspaces(host: Host) {
     retryFailed = false,
   ): Promise<KeptWork | undefined> {
     const record = await get(id, context)
-    if (!record) return undefined
+    if (!record || record.external) return undefined
     const harness = host.harness()
     const index = await harness.snapshot(Workspaces, ROOT_CONVERSATION_ID, context)
     const parent = Object.entries(index?.items ?? {}).find(
@@ -969,6 +979,36 @@ export function workspaces(host: Host) {
     progress,
     release,
     sweep,
+    async adopt(tx: Tx, id: ConversationId, path: string) {
+      path = await realpath(path)
+      const source = await realpath(
+        dirname(await git(path, 'rev-parse', '--path-format=absolute', '--git-common-dir')),
+      )
+      const checkout = await isolatable(source)
+      if ('reason' in checkout) throw new Error(checkout.reason)
+      const { target } = checkout
+      const registered = (await git(source, 'worktree', 'list', '--porcelain'))
+        .split('\n\n')
+        .some((entry) => entry.split('\n').includes(`worktree ${path}`))
+      if (!registered) throw new Error(`Path is not a registered worktree: ${path}`)
+      const branch = await git(path, 'symbolic-ref', '--short', 'HEAD').catch(() => '')
+      if (!branch) throw new Error('Adopting a worktree needs a checked-out branch')
+      if (branch === target) throw new Error('Adopted worktree branch must differ from target')
+      const base = await git(path, 'merge-base', `refs/heads/${target}`, 'HEAD')
+      const index = await tx.doc(Workspaces, ROOT_CONVERSATION_ID)
+      if (index.items[String(id)]) throw new Error('Conversation already has a workspace')
+      index.items[String(id)] = {
+        path,
+        branch,
+        base,
+        source,
+        target,
+        state: 'ready',
+        external: true,
+      }
+      await configure(tx, id, { cwd: path })
+      return index.items[String(id)]
+    },
     async create(tx: Tx, id: ConversationId, cwd: string) {
       if (
         !host.extensions().some((extension) => extension.name === 'workspaces' && extension.enabled)
@@ -1035,7 +1075,7 @@ export function workspaces(host: Host) {
       if (!workspace) throw new Error('Conversation has no workspace')
       if (workspace.state === 'preparing') throw new Error('Workspace is preparing')
       if (workspace.state !== 'removed') {
-        if (await listedBySource(workspace))
+        if (!workspace.external && (await listedBySource(workspace)))
           await removeCheckoutWithoutForce(
             await host.projectSettings(),
             workspace.source,
